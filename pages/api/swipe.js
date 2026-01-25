@@ -1,15 +1,15 @@
 import prisma from '../../lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
-import { mockTracks } from "../../mockData"; // Fallback/dev helper if needed
 
 export default async function handler(req, res) {
     const session = await getServerSession(req, res, authOptions);
 
-    // Use session user ID if available, otherwise default to 1 (for testing without login if desired, or strictly require login)
-    // For now, let's strictly require it but fallback to 1 only if MOCK_MODE dictates or for ease of testing
-    // Better: Default to 1 if no session for continuity with previous steps, but use session if present.
-    const userId = session?.user?.id ? parseInt(session.user.id) : 1;
+    if (!session || !session.user || !session.user.id) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const userId = session.user.id;
 
     if (req.method === "POST") {
         const { trackId, liked } = req.body;

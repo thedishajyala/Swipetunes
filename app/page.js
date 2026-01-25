@@ -1,139 +1,197 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, useAnimation } from "framer-motion";
+import { useSession, signIn } from "next-auth/react";
+import SwipeCard from "../components/SwipeCard";
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [tracks, setTracks] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [swipeDirection, setSwipeDirection] = useState(null);
   const controls = useAnimation();
 
   useEffect(() => {
-    fetch("/api/swipe")
-      .then((res) => res.json())
-      .then((data) => setTracks(data))
-      .catch((err) => console.error("Failed to fetch tracks:", err));
-  }, []);
+    if (status === "authenticated") {
+      fetch("/api/swipe")
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch");
+          return res.json();
+        })
+        .then((data) => setTracks(data))
+        .catch((err) => console.error("Failed to fetch tracks:", err));
+    }
+  }, [status]);
 
   const handleSwipe = async (liked) => {
     const track = tracks[currentIndex];
 
-    // Assuming a test user ID of 1 for now (since we don't have auth session yet)
-    // You would typically get this from your session
+    // Optimistic enhancement: immediately show next card while api call happens
+    setSwipeDirection(null);
+    setCurrentIndex((prev) => prev + 1);
+
     await fetch("/api/swipe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trackId: track.id, liked }),
     });
-
-    setCurrentIndex((prev) => prev + 1);
   };
 
+  const handleDrag = (event, info) => {
+    if (info.offset.x > 50) setSwipeDirection("right");
+    else if (info.offset.x < -50) setSwipeDirection("left");
+    else setSwipeDirection(null);
+  }
+
   const handleDragEnd = async (event, info) => {
-    if (info.offset.x > 100) {
-      // Swiped Right (Like)
-      await controls.start({ x: 500, opacity: 0 });
+    const threshold = 100;
+    if (info.offset.x > threshold) {
+      await controls.start({ x: 500, opacity: 0, rotate: 20, transition: { duration: 0.4 } });
       handleSwipe(true);
-    } else if (info.offset.x < -100) {
-      // Swiped Left (Dislike)
-      await controls.start({ x: -500, opacity: 0 });
+    } else if (info.offset.x < -threshold) {
+      await controls.start({ x: -500, opacity: 0, rotate: -20, transition: { duration: 0.4 } });
       handleSwipe(false);
     } else {
-      // Reset
-      controls.start({ x: 0 });
+      controls.start({ x: 0, opacity: 1, rotate: 0, transition: { type: "spring", stiffness: 300, damping: 20 } });
+      setSwipeDirection(null);
     }
   };
 
   useEffect(() => {
-    controls.set({ x: 0, opacity: 1 });
+    controls.set({ x: 0, opacity: 1, rotate: 0 });
+    setSwipeDirection(null);
   }, [currentIndex, controls]);
 
-  if (!tracks.length) return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
-      <p>Loading tracks...</p>
-    </div>
-  );
-
-  if (currentIndex >= tracks.length) return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
-      <p className="text-xl mb-4">No more tracks!</p>
-      <div className="flex gap-4">
-        <button
-          className="px-6 py-2 bg-blue-500 rounded hover:bg-blue-600 transition-colors"
-          onClick={() => window.location.href = "/recommendations"}
-        >
-          See Recommendations
-        </button>
-        <button
-          className="px-6 py-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors"
-          onClick={() => window.location.href = "/history"}
-        >
-          History
-        </button>
+  if (status === "loading") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
+        <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-6 relative overflow-hidden">
+        {/* Background noise texture */}
+        <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] "></div>
+
+        {/* Ambient Background Spotlights */}
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-green-500/20 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/20 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="z-10 flex flex-col items-center text-center max-w-lg">
+          <div className="mb-8 p-4 bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 shadow-2xl">
+            <span className="text-6xl">🎵</span>
+          </div>
+          <h1 className="text-5xl font-black mb-6 tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-white to-gray-400">
+            Swipetunes
+          </h1>
+          <p className="text-xl text-gray-400 mb-10 font-medium">
+            Discover music by swiping. Connect with friends. Compare tastes.
+          </p>
+          <button
+            onClick={() => signIn("spotify")}
+            className="group relative px-8 py-4 bg-[#1DB954] text-black font-bold rounded-full text-lg hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_0_40px_rgba(29,185,84,0.4)] overflow-hidden"
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" /></svg>
+              Continue with Spotify
+            </span>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const track = tracks[currentIndex];
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4 overflow-hidden">
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: 0 }}
-        onDragEnd={handleDragEnd}
-        animate={controls}
-        initial={{ scale: 0.9, opacity: 0 }}
-        whileInView={{ scale: 1, opacity: 1 }}
-        className="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-sm w-full text-center border border-gray-700 cursor-grab active:cursor-grabbing"
-      >
-        {track.coverImage && (
-          <img
-            src={track.coverImage}
-            alt={track.name}
-            className="w-full h-64 object-cover rounded-lg mb-6 shadow-md"
-          />
-        )}
-        <h1 className="text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500">{track.name}</h1>
-        <p className="mb-4 text-gray-400 text-lg">{track.artist}</p>
+  if (!tracks.length) return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
+      <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
 
-        {track.previewUrl && (
-          <audio controls className="w-full mb-6" src={track.previewUrl}>
-            Your browser does not support the audio element.
-          </audio>
-        )}
+  if (!track) return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-6 relative overflow-hidden">
+      {/* Background noise texture */}
+      <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] "></div>
 
-        <div className="flex gap-6 justify-center mt-8">
-          <button
-            className="w-16 h-16 flex items-center justify-center bg-red-500/20 text-red-500 border-2 border-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all duration-300 text-2xl"
-            onClick={() => handleSwipe(false)}
-            aria-label="Dislike"
-          >
-            ✕
-          </button>
-          <button
-            className="w-16 h-16 flex items-center justify-center bg-green-500/20 text-green-500 border-2 border-green-500 rounded-full hover:bg-green-500 hover:text-white transition-all duration-300 text-2xl"
-            onClick={() => handleSwipe(true)}
-            aria-label="Like"
-          >
-            ✓
-          </button>
-        </div>
+      <div className="z-10 text-center max-w-md">
+        <h2 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-green-400">All Caught Up!</h2>
+        <p className="text-gray-400 mb-8 text-lg">You've swiped through all available tracks for now.</p>
 
-        <div className="mt-8 flex gap-3 justify-center">
+        <div className="flex gap-4 justify-center">
           <button
-            className="px-6 py-2 bg-blue-500/10 text-blue-400 text-sm rounded-full hover:bg-blue-500 hover:text-white transition-colors"
+            className="px-8 py-4 bg-white text-black rounded-full font-bold hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.2)]"
             onClick={() => window.location.href = "/recommendations"}
           >
-            Recommendations
+            View Matches
           </button>
           <button
-            className="px-6 py-2 bg-gray-700/50 text-gray-400 text-sm rounded-full hover:bg-gray-700 hover:text-white transition-colors"
+            className="px-8 py-4 bg-gray-900 border border-gray-700 rounded-full font-bold hover:bg-gray-800 transition-colors"
             onClick={() => window.location.href = "/history"}
           >
             History
           </button>
         </div>
-      </motion.div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-black overflow-hidden relative">
+
+      {/* Dynamic Ambient Background */}
+      {track.coverImage && (
+        <div className="absolute inset-0 z-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center blur-[100px] opacity-40 scale-125 transition-all duration-[1000ms]"
+            style={{ backgroundImage: `url(${track.coverImage})` }}
+          />
+          <div className="absolute inset-0 bg-black/40" />
+        </div>
+      )}
+
+      {/* Navigation */}
+      <div className="absolute top-0 w-full p-6 flex justify-between items-center z-20">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-tr from-green-400 to-blue-500 rounded-full animate-pulse" />
+          <span className="font-bold text-xl tracking-tight text-white">Swipetunes</span>
+        </div>
+        <div className="flex gap-6">
+          <button onClick={() => window.location.href = "/history"} className="text-white/60 hover:text-white font-medium transition-colors">History</button>
+          <button onClick={() => window.location.href = "/recommendations"} className="text-white/60 hover:text-white font-medium transition-colors">Matches</button>
+        </div>
+      </div>
+
+      {/* Card Container */}
+      <div className="relative z-10 w-full max-w-md flex justify-center items-center h-[700px]">
+        <SwipeCard
+          track={track}
+          swipeDirection={swipeDirection}
+          dragHandlers={{ onDrag: handleDrag, onDragEnd: handleDragEnd }}
+          controls={controls}
+        />
+      </div>
+
+      {/* Floating Action Buttons (for accessibility/alternate control) */}
+      <div className="absolute bottom-10 z-20 flex gap-8">
+        <button
+          onClick={() => { controls.start({ x: -500, opacity: 0, rotate: -20, transition: { duration: 0.4 } }); handleSwipe(false); }}
+          className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-md border border-red-500/30 text-red-500 flex items-center justify-center text-3xl hover:bg-red-500 hover:text-white hover:border-red-500 transition-all duration-300 shadow-lg hover:shadow-red-500/50"
+        >
+          ✕
+        </button>
+        <button
+          onClick={() => { controls.start({ x: 500, opacity: 0, rotate: 20, transition: { duration: 0.4 } }); handleSwipe(true); }}
+          className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-md border border-green-500/30 text-green-500 flex items-center justify-center text-3xl hover:bg-green-500 hover:text-white hover:border-green-500 transition-all duration-300 shadow-lg hover:shadow-green-500/50"
+        >
+          ♥
+        </button>
+      </div>
+
     </div>
   );
 }

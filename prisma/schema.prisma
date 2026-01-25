@@ -6,12 +6,61 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  topTracks Track[]
-  swipes    Swipe[]
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  bio           String?   // New: User bio
+  spotifyUrl    String?   // New: Link to Spotify profile
+  
+  accounts      Account[]
+  sessions      Session[]
+  
+  topTracks     Track[]
+  swipes        Swipe[]
+  topArtists    Artist[]
+
+  // Self-referencing relation for followers/following
+  followedBy    User[]  @relation("UserFollows")
+  following     User[]  @relation("UserFollows")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model Track {
@@ -25,16 +74,27 @@ model Track {
   popularity  Int
   coverImage  String?
   previewUrl  String?
+  genre       String?
   swipes      Swipe[]
-  user        User?   @relation(fields: [userId], references: [id])
-  userId      Int?
+  users       User[]
+}
+
+model Artist {
+  id        Int      @id @default(autoincrement())
+  spotifyId String   @unique
+  name      String
+  image     String?
+  genres    String?
+  popularity Int?
+  users     User[]
 }
 
 model Swipe {
   id      Int    @id @default(autoincrement())
   user    User   @relation(fields: [userId], references: [id])
-  userId  Int
+  userId  String // Changed to String to match User.id (CUID)
   track   Track  @relation(fields: [trackId], references: [id])
   trackId Int
   liked   Boolean
 }
+
