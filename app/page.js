@@ -58,9 +58,6 @@ export default function Home() {
     // Step 4: Login with Spotify
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
-      options: {
-        redirectTo: window.location.origin, // Supabase redirects to site URL then callback
-      }
     });
   }
 
