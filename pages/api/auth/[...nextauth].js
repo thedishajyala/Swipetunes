@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import SpotifyProvider from "next-auth/providers/spotify";
-import { SupabaseAdapter } from "@next-auth/supabase-adapter";
+import { SupabaseAdapter } from "../../../lib/supabase-adapter";
 
 import { syncSpotifyData } from "../../../lib/sync";
 
@@ -10,6 +10,7 @@ export const authOptions = {
         url: process.env.NEXT_PUBLIC_SUPABASE_URL,
         secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
     }),
+    debug: true,
     session: {
         strategy: "jwt",
     },
@@ -17,8 +18,12 @@ export const authOptions = {
     events: {
         async signIn({ user, account, profile, isNewUser }) {
             if (account?.provider === "spotify" && account.access_token) {
-                // Run async sync (don't await to not block sign in)
-                syncSpotifyData(user.id, account.access_token);
+                // Run sync safely
+                try {
+                    await syncSpotifyData(user.id, account.access_token);
+                } catch (error) {
+                    console.error("Sync failed during sign in:", error);
+                }
             }
         },
     },
