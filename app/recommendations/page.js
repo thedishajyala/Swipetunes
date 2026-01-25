@@ -1,19 +1,50 @@
 "use client";
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function Recommendations() {
     const [recs, setRecs] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch("/api/recommend")
-            .then((res) => res.json())
-            .then((data) => setRecs(data.recommendations))
-            .catch(err => console.error("Failed to fetch recommendations", err));
+        async function fetchRecs() {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (session) {
+                // 1. Get all swiped tracks (liked or disliked) to exclude
+                const { data: swipes } = await supabase
+                    .from('swipes')
+                    .select('track_id')
+                    .eq('user_id', session.user.id);
+
+                const swipedIds = swipes ? swipes.map(s => s.track_id) : [];
+
+                // 2. Fetch tracks NOT in swipedIds
+                let query = supabase.from('tracks').select('*').limit(20);
+
+                if (swipedIds.length > 0) {
+                    // Supabase .not instruction
+                    query = query.not('id', 'in', `(${swipedIds.join(',')})`);
+                }
+
+                // Simple 'random' or popularity based recommendation for now
+                // Since we removed the complex API logic, we just show unswiped tracks.
+                // We can order by popularity if available
+                query = query.order('popularity', { ascending: false });
+
+                const { data: tracks } = await query;
+                if (tracks) setRecs(tracks);
+            }
+            setLoading(false);
+        }
+        fetchRecs();
     }, []);
+
+    if (loading) return <div className="p-8 text-white">Loading...</div>;
 
     if (!recs || !recs.length) return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
-            <p className="text-xl">No recommendations yet! Swipe some tracks first.</p>
+            <p className="text-xl">No recommendations yet or we ran out! Swipe to verify.</p>
             <button
                 className="mt-6 px-6 py-2 bg-blue-500 rounded hover:bg-blue-600 transition-colors"
                 onClick={() => window.location.href = "/"}
@@ -41,21 +72,26 @@ export default function Recommendations() {
                         <p className="text-gray-400 mb-4 truncate">{track.artist}</p>
 
                         <div className="space-y-1 text-sm text-gray-500">
-                            <div className="flex justify-between">
-                                <span>Energy</span>
-                                <div className="w-24 bg-gray-700 rounded-full h-2 mt-1">
-                                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${track.energy * 100}%` }}></div>
+                            {/* Audio features visualization */}
+                            {track.energy !== undefined && (
+                                <div className="flex justify-between">
+                                    <span>Energy</span>
+                                    <div className="w-24 bg-gray-700 rounded-full h-2 mt-1">
+                                        <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${track.energy * 100}%` }}></div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Valence</span>
-                                <div className="w-24 bg-gray-700 rounded-full h-2 mt-1">
-                                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${track.valence * 100}%` }}></div>
+                            )}
+                            {track.valence !== undefined && (
+                                <div className="flex justify-between">
+                                    <span>Valence</span>
+                                    <div className="w-24 bg-gray-700 rounded-full h-2 mt-1">
+                                        <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${track.valence * 100}%` }}></div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                             <div className="flex justify-between">
                                 <span>Tempo</span>
-                                <span>{Math.round(track.tempo)} BPM</span>
+                                <span>{track.tempo ? Math.round(track.tempo) : 0} BPM</span>
                             </div>
                         </div>
                     </div>

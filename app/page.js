@@ -1,40 +1,84 @@
 "use client";
 import { useState, useEffect } from "react";
-import { motion, useAnimation } from "framer-motion";
-import { useSession, signIn } from "next-auth/react";
+import { useAnimation } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 import SwipeCard from "../components/SwipeCard";
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const [session, setSession] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState(null);
   const controls = useAnimation();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      fetch("/api/swipe")
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to fetch");
-          return res.json();
-        })
-        .then((data) => setTracks(data))
-        .catch((err) => console.error("Failed to fetch tracks:", err));
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) handleProfileUpsert(session.user);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) handleProfileUpsert(session.user);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch tracks (Optimistically checking 'tracks' table or keeping it dry for now)
+  // Since 'api/swipe' is gone, we fetch from Supabase if 'tracks' table exists.
+  // Previous migration created 'tracks'.
+  useEffect(() => {
+    if (session) {
+      async function fetchTracks() {
+        const { data, error } = await supabase.from('tracks').select('*').limit(20);
+        if (data) setTracks(data);
+      }
+      fetchTracks();
     }
-  }, [status]);
+  }, [session]);
+
+  const handleProfileUpsert = async (user) => {
+    // Step 7: Create profile
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      name: user.user_metadata.full_name,
+      avatar: user.user_metadata.avatar_url,
+    });
+  }
+
+  const loginWithSpotify = async () => {
+    // Step 4: Login with Spotify
+    await supabase.auth.signInWithOAuth({
+      provider: 'spotify',
+      options: {
+        redirectTo: window.location.origin, // Supabase redirects to site URL then callback
+      }
+    });
+  }
 
   const handleSwipe = async (liked) => {
     const track = tracks[currentIndex];
 
-    // Optimistic enhancement: immediately show next card while api call happens
+    // Optimistic UI update
     setSwipeDirection(null);
     setCurrentIndex((prev) => prev + 1);
 
-    await fetch("/api/swipe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trackId: track.id, liked }),
-    });
+    // Step 6: Store swipe in Supabase 'swipes' table
+    if (session?.user && track) {
+      await supabase.from('swipes').insert({
+        user_id: session.user.id,
+        track_id: track.id, // Assuming track.id is a string/int stored in track_id
+        liked
+      });
+    }
   };
 
   const handleDrag = (event, info) => {
@@ -62,7 +106,7 @@ export default function Home() {
     setSwipeDirection(null);
   }, [currentIndex, controls]);
 
-  if (status === "loading") {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
         <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
@@ -70,7 +114,7 @@ export default function Home() {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (!session) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-6 relative overflow-hidden">
         {/* Background noise texture */}
@@ -91,12 +135,12 @@ export default function Home() {
             Discover music by swiping. Connect with friends. Compare tastes.
           </p>
           <button
-            onClick={() => signIn("spotify")}
+            onClick={loginWithSpotify}
             className="group relative px-8 py-4 bg-[#1DB954] text-black font-bold rounded-full text-lg hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_0_40px_rgba(29,185,84,0.4)] overflow-hidden"
           >
             <span className="relative z-10 flex items-center gap-2">
               <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" /></svg>
-              Continue with Spotify
+              Login with Spotify
             </span>
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
           </button>
@@ -110,6 +154,7 @@ export default function Home() {
   if (!tracks.length) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
       <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="mt-4 text-gray-400">Loading Tracks...</p>
     </div>
   );
 
@@ -163,6 +208,7 @@ export default function Home() {
         <div className="flex gap-6">
           <button onClick={() => window.location.href = "/history"} className="text-white/60 hover:text-white font-medium transition-colors">History</button>
           <button onClick={() => window.location.href = "/recommendations"} className="text-white/60 hover:text-white font-medium transition-colors">Matches</button>
+          <button onClick={() => supabase.auth.signOut()} className="text-red-400 hover:text-red-300 font-medium transition-colors">Sign Out</button>
         </div>
       </div>
 
@@ -176,7 +222,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Floating Action Buttons (for accessibility/alternate control) */}
+      {/* Floating Action Buttons */}
       <div className="absolute bottom-10 z-20 flex gap-8">
         <button
           onClick={() => { controls.start({ x: -500, opacity: 0, rotate: -20, transition: { duration: 0.4 } }); handleSwipe(false); }}

@@ -1,17 +1,46 @@
 "use client";
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function History() {
     const [tracks, setTracks] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch("/api/history")
-            .then((res) => res.json())
-            .then((data) => setTracks(data.tracks))
-            .catch((err) => console.error("Failed to fetch history:", err));
+        async function fetchHistory() {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (session) {
+                // 1. Get liked swipes
+                const { data: swipes, error: swipesError } = await supabase
+                    .from('swipes')
+                    .select('track_id')
+                    .eq('user_id', session.user.id)
+                    .eq('liked', true);
+
+                if (swipes && swipes.length > 0) {
+                    // 2. Get tracks
+                    const trackIds = swipes.map(s => s.track_id);
+                    // Use 'in' filter. Note: if trackIds is huge, this might break. For demo it's fine.
+                    const { data: tracksData, error: tracksError } = await supabase
+                        .from('tracks')
+                        .select('*')
+                        .in('id', trackIds);
+
+                    if (tracksData) setTracks(tracksData);
+                } else {
+                    setTracks([]);
+                }
+            }
+            setLoading(false);
+        }
+        fetchHistory();
     }, []);
 
+    if (loading) return <div className="p-8 text-white">Loading...</div>;
+
     if (!tracks || !tracks.length) return (
+        // ... (Keep existing UI for empty state)
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
             <p className="text-xl">No liked songs yet! Go swipe right on some tracks.</p>
             <button
@@ -39,11 +68,12 @@ export default function History() {
                         )}
                         <div className="flex-grow">
                             <h2 className="text-xl font-semibold text-white">{track.name}</h2>
+                            {/* Handle legacy 'artist' field (string) vs joined artist. Previously I upserte 'artist' string. */}
                             <p className="text-gray-400">{track.artist}</p>
                         </div>
 
                         <div className="text-right text-sm text-gray-500 mr-4 hidden sm:block">
-                            <p>{Math.round(track.tempo)} BPM</p>
+                            <p>{track.tempo ? Math.round(track.tempo) : 0} BPM</p>
                         </div>
                     </div>
                 ))}
