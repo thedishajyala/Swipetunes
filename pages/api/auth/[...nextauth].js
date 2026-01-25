@@ -1,13 +1,15 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import SpotifyProvider from "next-auth/providers/spotify";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { prisma } from "../../../lib/prisma";
+import { SupabaseAdapter } from "@next-auth/supabase-adapter";
 
 import { syncSpotifyData } from "../../../lib/sync";
 
 export const authOptions = {
-    adapter: PrismaAdapter(prisma),
+    adapter: SupabaseAdapter({
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    }),
     session: {
         strategy: "jwt",
     },

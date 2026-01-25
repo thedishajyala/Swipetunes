@@ -1,4 +1,4 @@
-import prisma from '../../lib/prisma';
+import { supabaseAdmin } from '../../lib/supabase';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
 
@@ -15,13 +15,18 @@ export default async function handler(req, res) {
         const { trackId, liked } = req.body;
 
         try {
-            const swipe = await prisma.swipe.create({
-                data: {
-                    userId,
-                    trackId,
+            const { data: swipe, error } = await supabaseAdmin
+                .from('swipes')
+                .insert({
+                    "userId": userId,
+                    "trackId": trackId,
                     liked,
-                },
-            });
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
             res.status(200).json({ success: true, swipe });
         } catch (err) {
             console.error(err);
@@ -30,7 +35,12 @@ export default async function handler(req, res) {
     } else if (req.method === "GET") {
         try {
             // Return tracks to swipe
-            const tracks = await prisma.track.findMany();
+            const { data: tracks, error } = await supabaseAdmin
+                .from('tracks')
+                .select('*');
+
+            if (error) throw error;
+
             res.status(200).json(tracks);
         } catch (err) {
             console.error(err);

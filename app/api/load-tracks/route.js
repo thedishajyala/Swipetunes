@@ -1,17 +1,16 @@
-import prisma from "../../../lib/prisma";
+import { supabaseAdmin } from "../../../lib/supabase";
 
 export async function GET() {
     try {
         const res = await fetch("http://localhost:3000/api/deezer");
         const tracks = await res.json();
 
-        for (const track of tracks) {
-            await prisma.track.upsert({
-                where: { spotifyId: track.spotifyId },
-                update: {},
-                create: track,
-            });
-        }
+        // Bulk upsert is more efficient
+        const { error } = await supabaseAdmin
+            .from('tracks')
+            .upsert(tracks, { onConflict: 'spotifyId', ignoreDuplicates: true });
+
+        if (error) throw error;
 
         return Response.json({ message: "Tracks loaded from Deezer!" });
     } catch (error) {
