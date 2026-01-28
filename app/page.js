@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { useAnimation } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import SwipeCard from "../components/SwipeCard";
+import SkeletonCard from "../components/SkeletonCard";
+import UserProfile from "../components/UserProfile";
 
 export default function Home() {
   const [session, setSession] = useState(null);
@@ -11,12 +13,16 @@ export default function Home() {
   const [swipeDirection, setSwipeDirection] = useState(null);
   const controls = useAnimation();
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ swipes: 0 });
 
   useEffect(() => {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) handleProfileUpsert(session.user);
+      if (session) {
+        handleProfileUpsert(session.user);
+        fetchStats(session.user.id);
+      }
       setLoading(false);
     });
 
@@ -25,14 +31,24 @@ export default function Home() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) handleProfileUpsert(session.user);
+      if (session) {
+        handleProfileUpsert(session.user);
+        fetchStats(session.user.id);
+      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch tracks (Optimistically checking 'tracks' table or keeping it dry for now)
+  const fetchStats = async (userId) => {
+    const { count } = await supabase
+      .from('swipes')
+      .select('*', { count: 'exact', head: true })
+      .eq('liked', true)
+      .eq('user_id', userId);
+    setStats({ swipes: count || 0 });
+  };
   // Since 'api/swipe' is gone, we fetch from Supabase if 'tracks' table exists.
   // Previous migration created 'tracks'.
   useEffect(() => {
@@ -58,6 +74,9 @@ export default function Home() {
     // Step 4: Login with Spotify
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      }
     });
   }
 
@@ -75,6 +94,7 @@ export default function Home() {
         track_id: track.id, // Assuming track.id is a string/int stored in track_id
         liked
       });
+      if (liked) setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
     }
   };
 
@@ -106,7 +126,8 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
-        <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+        <SkeletonCard />
+        <p className="mt-8 text-gray-500 font-medium animate-pulse">Curating your vibe...</p>
       </div>
     );
   }
@@ -196,20 +217,16 @@ export default function Home() {
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="absolute top-0 w-full p-6 flex justify-between items-center z-20">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-tr from-green-400 to-blue-500 rounded-full animate-pulse" />
-          <span className="font-bold text-xl tracking-tight text-white">Swipetunes</span>
-        </div>
-        <div className="flex gap-6">
-          <button onClick={() => window.location.href = "/history"} className="text-white/60 hover:text-white font-medium transition-colors">History</button>
-          <button onClick={() => window.location.href = "/recommendations"} className="text-white/60 hover:text-white font-medium transition-colors">Matches</button>
-          <button onClick={() => supabase.auth.signOut()} className="text-red-400 hover:text-red-300 font-medium transition-colors">Sign Out</button>
+      {/* Header Info */}
+      <div className="absolute top-0 w-full p-6 flex flex-col items-center z-20 pointer-events-none">
+
+        {/* User Stats Display */}
+        <div className="pointer-events-auto w-full flex justify-center">
+          <UserProfile session={session} stats={stats} />
         </div>
       </div>
 
-      {/* Card Container */}
+      {/* Card Container */},
       <div className="relative z-10 w-full max-w-md flex justify-center items-center h-[700px]">
         <SwipeCard
           track={track}
