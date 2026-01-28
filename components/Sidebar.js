@@ -7,7 +7,7 @@ export default function Sidebar() {
 
     const navItems = [
         { name: "Swipe", path: "/", icon: "🎵" },
-        { name: "My Identity", path: "/artists", icon: "👤" },
+        { name: "My Identity", path: "/profile", icon: "👤" },
         { name: "Matches", path: "/recommendations", icon: "💞" },
         { name: "History", path: "/history", icon: "📜" },
     ];
@@ -29,8 +29,8 @@ export default function Sidebar() {
                             key={item.path}
                             href={item.path}
                             className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 font-bold ${isActive
-                                    ? "bg-white text-black shadow-lg scale-105"
-                                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                                ? "bg-white text-black shadow-lg scale-105"
+                                : "text-gray-400 hover:text-white hover:bg-white/5"
                                 }`}
                         >
                             <span className="text-xl">{item.icon}</span>

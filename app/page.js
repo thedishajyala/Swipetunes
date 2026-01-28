@@ -43,9 +43,9 @@ export default function Home() {
 
   const fetchStats = async (userId) => {
     const { count } = await supabase
-      .from('swipes')
+      .from('user_interactions')
       .select('*', { count: 'exact', head: true })
-      .eq('liked', true)
+      .eq('action', 'like')
       .eq('user_id', userId);
     setStats({ swipes: count || 0 });
   };
@@ -87,12 +87,12 @@ export default function Home() {
     setSwipeDirection(null);
     setCurrentIndex((prev) => prev + 1);
 
-    // Step 6: Store swipe in Supabase 'swipes' table
+    // Step 6: Store swipe in Supabase 'user_interactions' table
     if (session?.user && track) {
-      await supabase.from('swipes').insert({
+      await supabase.from('user_interactions').insert({
         user_id: session.user.id,
-        track_id: track.id, // Assuming track.id is a string/int stored in track_id
-        liked
+        track_id: track.id,
+        action: liked ? 'like' : 'dislike'
       });
       if (liked) setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
     }
