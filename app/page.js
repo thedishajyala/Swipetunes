@@ -45,6 +45,14 @@ export default function Home() {
     if (status !== "loading") setLoading(false);
   }, [session, status]);
 
+  // Infinite Scroll / Refill Logic
+  useEffect(() => {
+    if (tracks.length > 0 && tracks.length - currentIndex < 5 && !loadingMore) {
+      console.log("Home: Refilling track queue...");
+      fetchTracks(true);
+    }
+  }, [tracks.length, currentIndex]);
+
   const fetchStats = async (userId) => {
     try {
       const { count, error: statsError } = await supabase
@@ -88,9 +96,6 @@ export default function Home() {
     const track = tracks[currentIndex];
 
     // Check if we need more tracks
-    if (currentIndex >= tracks.length - 5 && !loadingMore) {
-      fetchTracks(true);
-    }
 
     setSwipeDirection(null);
     setCurrentIndex((prev) => prev + 1);
