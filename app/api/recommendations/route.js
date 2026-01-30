@@ -90,7 +90,9 @@ export async function GET(req) {
             debug_info: {
                 has_spotify_secret: !!process.env.SPOTIFY_CLIENT_SECRET,
                 has_supabase_admin: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-                env: process.env.NODE_ENV
+                env: process.env.NODE_ENV,
+                api_error_name: err.name,
+                api_error_code: err.statusCode || err.code
             }
         }, { status: 500 });
     }
