@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { HiOutlinePlay, HiOutlinePause, HiOutlineShare } from "react-icons/hi";
+import { motion } from "framer-motion";
 
 export default function SwipeCard({ track, swipeDirection, dragHandlers, controls }) {
     const [isPlaying, setIsPlaying] = useState(false);
