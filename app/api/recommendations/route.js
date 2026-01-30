@@ -65,12 +65,22 @@ export async function GET(req) {
         // 5. COMBINE: My Top Songs + New Discoveries
         // The user wants to see their top songs too!
 
-        // 6. Filter: Require Preview URL for Recommendations, but ALLOW Top Tracks without it (visual only)
+        // 6. Filter: Require Preview URL for Recommendations, but ALLOW User's Own Tracks without it (visual only)
         // We Deduplicate by ID
         const seenIds = new Set();
         let validTracks = mixedRawTracks
             .filter(track => {
-                if (!track || !track.preview_url) return false;
+                if (!track) return false;
+
+                // Check if this track is from the user's history/library
+                const isUserTrack =
+                    topTracks.some(t => t.id === track.id) ||
+                    recentTracks.some(t => t.id === track.id) ||
+                    savedTracks.some(t => t.id === track.id);
+
+                // If it's a new recommendation, it MUST have audio.
+                // If it's the user's own track, we allow it even without audio (Visual Mode).
+                if (!isUserTrack && !track.preview_url) return false;
 
                 if (seenIds.has(track.id)) return false;
                 seenIds.add(track.id);
@@ -82,7 +92,7 @@ export async function GET(req) {
                 artist: track.artists?.map(a => a.name).join(', ') || "Unknown Artist",
                 album: track.album?.name || "Unknown Album",
                 cover_url: track.album?.images?.[0]?.url || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format",
-                preview_url: track.preview_url,
+                preview_url: track.preview_url, // Might be null for user tracks
                 color: '#1DB954'
             }));
 
