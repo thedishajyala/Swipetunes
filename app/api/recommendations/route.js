@@ -8,6 +8,9 @@ export async function GET(req) {
     console.log("Recommendations API: Initiating fetch...");
     try {
         const session = await getServerSession(authOptions);
+        console.log("Recommendations API: Session found?", !!session);
+        if (session) console.log("Recommendations API: AccessToken length:", session.accessToken?.length);
+
         if (!session || !session.accessToken) {
             console.warn("Recommendations API: Unauthorized - No session or accessToken");
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

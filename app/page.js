@@ -25,7 +25,8 @@ export default function Home() {
       fetchStats(session.user.id);
       fetchTracks();
     }
-  }, [session]);
+    if (status !== "loading") setLoading(false);
+  }, [session, status]);
 
   const fetchStats = async (userId) => {
     try {
