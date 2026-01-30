@@ -3,27 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getTopTracks, getRecommendations } from "@/lib/spotify";
-
-const FALLBACK_TRACKS = [
-    {
-        track_id: "0VjIjW4GlUZAMYd2vXMi3b",
-        title: "Blinding Lights",
-        artist: "The Weeknd",
-        album: "After Hours",
-        cover_url: "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36",
-        preview_url: "https://p.scdn.co/mp3-preview/bf41b83df88f57564d7010476a8820be459a96e8?cid=cfe923b2d660439caf2b557b21f31221",
-        color: '#ff0000'
-    },
-    {
-        track_id: "21jGcNKet2qwijl0efuYtR",
-        title: "Levitating",
-        artist: "Dua Lipa",
-        album: "Future Nostalgia",
-        cover_url: "https://i.scdn.co/image/ab67616d0000b273bd26ede1ae69327010d49946",
-        preview_url: null,
-        color: '#2d2d2d'
-    }
-];
+import { FALLBACK_CATALOG } from "@/lib/fallback-catalog";
 
 export async function GET(req) {
     try {
@@ -32,7 +12,7 @@ export async function GET(req) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // 1. Fetch seeds (Limit 50 for better variety)
+        // 1. Fetch seeds (Limit 50)
         let seedTrackIds = [];
         try {
             const topTracksData = await getTopTracks(session.accessToken, 'short_term', 50);
@@ -41,20 +21,20 @@ export async function GET(req) {
             console.warn("Recs API: Spotify fetch failed (Top Tracks).");
         }
 
-        // 2. Get recommendations (Limit 50)
+        // 2. Get recommendations (Limit 100 for maximum yield)
         let recs = [];
         try {
             const seeds = seedTrackIds.length > 0 ? seedTrackIds.slice(0, 5) : ['4iJyoBOLtHqaGxP12qzhQI'];
-            // Requesting 50 recommendations to allow for heavy filtering
-            recs = await getRecommendations(session.accessToken, seeds, { limit: 50 });
+            // Request 100 to increase odds of finding preview_urls
+            recs = await getRecommendations(session.accessToken, seeds, { limit: 100 });
         } catch (spotifyErr) {
             console.error("Recs API: Spotify Recommendations failed:", spotifyErr.message);
-            return NextResponse.json(FALLBACK_TRACKS);
+            // On error, we rely on fallbacks
         }
 
         // 3. Strict Filtering: MUST Have Preview URL
-        const tracks = (recs || [])
-            .filter(track => track && track.preview_url) // CRITICAL: Only tracks with audio
+        let tracks = (recs || [])
+            .filter(track => track && track.preview_url)
             .map(track => ({
                 track_id: track.id,
                 title: track.name || "Unknown Track",
@@ -65,7 +45,19 @@ export async function GET(req) {
                 color: '#1DB954'
             }));
 
-        // 4. Update catalog safely (in background if possible, or await)
+        // 4. HYBRID FILLER: If tracks < 10, fill with Curated Catalog
+        // Identify which fallbacks are not already in tacks
+        if (tracks.length < 10) {
+            const currentIds = new Set(tracks.map(t => t.track_id));
+            const needed = 10 - tracks.length;
+
+            const fillers = FALLBACK_CATALOG.filter(kt => !currentIds.has(kt.track_id));
+
+            // Randomly shuffle fillers to vary experience if possible, but simplest is just concat
+            tracks = [...tracks, ...fillers];
+        }
+
+        // 5. Update catalog safely
         if (tracks.length > 0 && supabaseAdmin) {
             try {
                 await supabaseAdmin
@@ -85,12 +77,20 @@ export async function GET(req) {
             }
         }
 
-        // Return filtered tracks. If we filtered everything away (unlikely with 50 limit), return fallback.
-        if (tracks.length === 0) return NextResponse.json(FALLBACK_TRACKS);
+        // 6. Deduplicate just in case
+        const seen = new Set();
+        const uniqueTracks = [];
+        for (const t of tracks) {
+            if (!seen.has(t.track_id)) {
+                seen.add(t.track_id);
+                uniqueTracks.push(t);
+            }
+        }
 
-        return NextResponse.json(tracks);
+        return NextResponse.json(uniqueTracks);
     } catch (err) {
         console.error('Recs API Critical Failure:', err);
-        return NextResponse.json(FALLBACK_TRACKS);
+        // Absolute fail-safe
+        return NextResponse.json(FALLBACK_CATALOG);
     }
 }
