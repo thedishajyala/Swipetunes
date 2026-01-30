@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import { HiOutlinePlay, HiOutlinePause, HiOutlineShare } from "react-icons/hi";
-import { motion } from "framer-motion";
+import { HiOutlinePlay, HiOutlinePause, HiOutlineShare, HiVolumeUp } from "react-icons/hi";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function SwipeCard({ track, swipeDirection, dragHandlers, controls }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
+    const [showInteractionPrompt, setShowInteractionPrompt] = useState(false);
 
     const togglePlay = async (e) => {
-        e.stopPropagation();
+        if (e) e.stopPropagation();
         if (audioRef.current) {
             try {
                 if (isPlaying) {
@@ -19,6 +20,7 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                     }
                 }
                 setIsPlaying(!isPlaying);
+                setShowInteractionPrompt(false);
             } catch (err) {
                 console.error("Playback failed:", err);
                 setIsPlaying(false);
@@ -30,20 +32,27 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
 
     useEffect(() => {
         setIsPlaying(false);
+        setShowInteractionPrompt(false);
+
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
 
-            // Autoplay logic for "Reels" feel
             if (previewSrc) {
                 const playTimeout = setTimeout(() => {
-                    audioRef.current.play().then(() => {
-                        setIsPlaying(true);
-                    }).catch(err => {
-                        console.log("Autoplay blocked or failed:", err);
-                        setIsPlaying(false);
-                    });
-                }, 500); // Slight delay for smooth transition
+                    const playPromise = audioRef.current.play();
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                setIsPlaying(true);
+                            })
+                            .catch(err => {
+                                console.log("Autoplay blocked. Showing prompt.", err);
+                                setIsPlaying(false);
+                                setShowInteractionPrompt(true);
+                            });
+                    }
+                }, 600);
                 return () => clearTimeout(playTimeout);
             }
         }
@@ -84,6 +93,24 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                 {/* Overlays */}
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/90 z-0" />
             </div>
+
+            {/* Tap to Listen Overlay (If Autoplay Blocked) */}
+            <AnimatePresence>
+                {showInteractionPrompt && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={togglePlay}
+                        className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer"
+                    >
+                        <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center animate-pulse">
+                            <HiOutlinePlay className="text-4xl text-white ml-1" />
+                        </div>
+                        <p className="mt-4 text-xs font-black uppercase tracking-widest text-white">Tap to Listen</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Swipe Indicators */}
             {swipeDirection === "right" && (
