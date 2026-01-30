@@ -48,9 +48,10 @@ const handler = NextAuth({
             try {
                 if (session.user?.email) {
                     await supabaseAdmin.from('profiles').upsert({
+                        id: token.sub || session.user.id, // Ensure we have an id
                         email: session.user.email,
-                        display_name: session.user.name,
-                        avatar_url: session.user.image,
+                        name: session.user.name,
+                        avatar: session.user.image,
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'email' });
                 }

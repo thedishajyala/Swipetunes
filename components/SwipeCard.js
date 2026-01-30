@@ -6,17 +6,27 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
 
-    const togglePlay = (e) => {
+    const togglePlay = async (e) => {
         e.stopPropagation();
         if (audioRef.current) {
-            if (isPlaying) {
-                audioRef.current.pause();
-            } else {
-                audioRef.current.play();
+            try {
+                if (isPlaying) {
+                    audioRef.current.pause();
+                } else {
+                    const playPromise = audioRef.current.play();
+                    if (playPromise !== undefined) {
+                        await playPromise;
+                    }
+                }
+                setIsPlaying(!isPlaying);
+            } catch (err) {
+                console.error("Playback failed:", err);
+                setIsPlaying(false);
             }
-            setIsPlaying(!isPlaying);
         }
     };
+
+    const previewSrc = track.previewUrl || track.preview_url;
 
     useEffect(() => {
         setIsPlaying(false);
@@ -105,8 +115,8 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                     </div>
                 </div>
 
-                {track.previewUrl && (
-                    <audio ref={audioRef} src={track.previewUrl} onEnded={() => setIsPlaying(false)} className="hidden" />
+                {previewSrc && (
+                    <audio ref={audioRef} src={previewSrc} onEnded={() => setIsPlaying(false)} className="hidden" />
                 )}
             </div>
         </motion.div>

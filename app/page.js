@@ -18,18 +18,18 @@ export default function Home() {
 
   useEffect(() => {
     if (session?.user) {
-      fetchStats(session.user.email);
+      fetchStats(session.user.id);
       fetchTracks();
     }
     if (status !== "loading") setLoading(false);
   }, [session, status]);
 
-  const fetchStats = async (email) => {
+  const fetchStats = async (userId) => {
     const { count } = await supabase
-      .from('user_interactions')
+      .from('swipes')
       .select('*', { count: 'exact', head: true })
-      .eq('action', 'like')
-      .eq('user_email', email); // Assuming we store by email now for NextAuth
+      .eq('liked', true)
+      .eq('user_id', userId);
     setStats({ swipes: count || 0 });
   };
 
@@ -43,11 +43,11 @@ export default function Home() {
     setSwipeDirection(null);
     setCurrentIndex((prev) => prev + 1);
 
-    if (session?.user?.email && track) {
-      await supabase.from('user_interactions').insert({
-        user_email: session.user.email,
+    if (session?.user?.id && track) {
+      await supabase.from('swipes').insert({
+        user_id: session.user.id,
         track_id: track.id,
-        action: liked ? 'like' : 'dislike'
+        liked: liked
       });
       if (liked) setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
     }
