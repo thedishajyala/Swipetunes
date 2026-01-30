@@ -62,35 +62,38 @@ export async function GET(req) {
         // 5. COMBINE ALL SOURCES (To find seeds/candidates)
         const mixedRawTracks = [...topTracks, ...recentTracks, ...savedTracks, ...recs];
 
-        // 6. Strict Filtering: MUST Have Preview URL (Pure Discovery Mode)
-        // We Deduplicate by ID
+        // 5. Filter: Prioritize Tracks with Previews, but accept Visual-Only if needed
         const seenIds = new Set();
-        let validTracks = mixedRawTracks
-            .filter(track => {
-                if (!track || !track.preview_url) return false;
+        const allUniqueTracks = mixedRawTracks.filter(t => {
+            if (!t) return false;
+            if (seenIds.has(t.id)) return false;
+            seenIds.add(t.id);
+            return true;
+        });
 
-                if (seenIds.has(track.id)) return false;
-                seenIds.add(track.id);
-                return true;
-            })
-            .map(track => ({
-                track_id: track.id,
-                title: track.name || "Unknown Track",
-                artist: track.artists?.map(a => a.name).join(', ') || "Unknown Artist",
-                album: track.album?.name || "Unknown Album",
-                cover_url: track.album?.images?.[0]?.url || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format",
-                preview_url: track.preview_url, // Might be null for user tracks
-                color: '#1DB954'
-            }));
+        // First, get strictly playable tracks
+        let validTracks = allUniqueTracks.filter(t => t.preview_url);
 
-        // 7. HYBRID FILLER: If tracks < 10, fill with Curated Catalog
+        // If we don't have enough playable tracks (e.g. < 10), fill up with non-playable recommendations
+        // This prevents the "Demo Songs" issue while trying to provide audio key.
         if (validTracks.length < 10) {
-            const currentIds = new Set(validTracks.map(t => t.track_id));
-            const fillers = FALLBACK_CATALOG.filter(kt => !currentIds.has(kt.track_id));
-            validTracks = [...validTracks, ...fillers];
+            const nonPlayable = allUniqueTracks.filter(t => !t.preview_url);
+            const needed = 10 - validTracks.length;
+            validTracks = [...validTracks, ...nonPlayable.slice(0, needed + 20)]; // Add plenty of backups
         }
 
-        // 8. Update catalog safely
+        // Format for Frontend
+        validTracks = validTracks.map(track => ({
+            track_id: track.id,
+            title: track.name || "Unknown Track",
+            artist: track.artists?.map(a => a.name).join(', ') || "Unknown Artist",
+            album: track.album?.name || "Unknown Album",
+            cover_url: track.album?.images?.[0]?.url || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format",
+            preview_url: track.preview_url,
+            color: '#1DB954'
+        }));
+
+        // 6. Update catalog safely
         if (validTracks.length > 0 && supabaseAdmin) {
             try {
                 await supabaseAdmin
@@ -110,7 +113,8 @@ export async function GET(req) {
             }
         }
 
-        // 9. If we have NO valid tracks and it was an API error, tell the user
+        // 7. Validation: If we STILL have nothing (e.g. API returned 0 recs), ONLY THEN error out.
+        // We do NOT fall back to Demo Catalog unless it's a hard crash.
         if (validTracks.length === 0 && apiError) {
             return NextResponse.json({
                 error: "Start Swiping Failed",
