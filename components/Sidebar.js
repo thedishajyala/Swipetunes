@@ -1,48 +1,85 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
+import {
+    HiOutlineMusicNote,
+    HiOutlineUserCircle,
+    HiOutlineLightningBolt,
+    HiOutlineClock,
+    HiOutlineLogout
+} from "react-icons/hi";
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const { data: session } = useSession();
 
     const navItems = [
-        { name: "Swipe", path: "/", icon: "🎵" },
-        { name: "My Identity", path: "/profile", icon: "👤" },
-        { name: "Matches", path: "/recommendations", icon: "💞" },
-        { name: "History", path: "/history", icon: "📜" },
+        { name: "Swipe", path: "/", icon: <HiOutlineMusicNote size={24} /> },
+        { name: "My Identity", path: "/profile", icon: <HiOutlineUserCircle size={24} /> },
+        { name: "Matches", path: "/recommendations", icon: <HiOutlineLightningBolt size={24} /> },
+        { name: "History", path: "/history", icon: <HiOutlineClock size={24} /> },
     ];
 
     return (
-        <div className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/10 p-6 flex flex-col z-50">
+        <div className="fixed left-0 top-0 h-full w-64 bg-black/40 backdrop-blur-xl border-r border-white/5 p-6 flex flex-col z-50">
+            {/* Grainy Texture Overlay */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+
             {/* Brand */}
-            <div className="mb-10 flex items-center gap-3 px-2">
-                <div className="w-8 h-8 bg-gradient-to-tr from-green-400 to-blue-500 rounded-full animate-pulse" />
+            <div className="mb-12 flex items-center gap-3 px-2 relative">
+                <div className="w-10 h-10 bg-gradient-to-tr from-[#1DB954] to-[#1ed760] rounded-2xl rotate-3 flex items-center justify-center shadow-lg shadow-green-500/20">
+                    <HiOutlineMusicNote className="text-black text-xl" />
+                </div>
                 <span className="text-2xl font-black tracking-tighter text-white">Swipetunes</span>
             </div>
 
             {/* Navigation */}
-            <nav className="flex flex-col gap-2">
+            <nav className="flex flex-col gap-3 relative">
                 {navItems.map((item) => {
                     const isActive = pathname === item.path;
                     return (
                         <Link
                             key={item.path}
                             href={item.path}
-                            className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 font-bold ${isActive
-                                ? "bg-white text-black shadow-lg scale-105"
-                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                            className={`flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-300 group ${isActive
+                                ? "bg-white text-black shadow-xl shadow-white/10 scale-[1.02]"
+                                : "text-gray-500 hover:text-white hover:bg-white/5"
                                 }`}
                         >
-                            <span className="text-xl">{item.icon}</span>
-                            <span>{item.name}</span>
+                            <span className={`transition-transform duration-300 ${isActive ? "scale-110" : "group-hover:scale-110"}`}>
+                                {item.icon}
+                            </span>
+                            <span className="font-bold tracking-tight">{item.name}</span>
                         </Link>
                     );
                 })}
             </nav>
 
-            {/* Footer / User Info could go here */}
-            <div className="mt-auto px-4 py-4 border-t border-white/5 text-gray-500 text-xs text-center">
-                © 2026 Swipetunes
+            {/* User Profile / Logout */}
+            <div className="mt-auto relative">
+                {session?.user && (
+                    <div className="p-4 bg-white/5 rounded-3xl border border-white/5 flex flex-col gap-4">
+                        <div className="flex items-center gap-3">
+                            <img
+                                src={session.user.image}
+                                alt={session.user.name}
+                                className="w-10 h-10 rounded-full border border-white/10"
+                            />
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-white truncate">{session.user.name}</span>
+                                <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Premium Plan</span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => signOut()}
+                            className="flex items-center justify-center gap-2 w-full py-2 bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-gray-400 text-xs font-bold rounded-xl transition-all duration-300"
+                        >
+                            <HiOutlineLogout />
+                            Sign Out
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

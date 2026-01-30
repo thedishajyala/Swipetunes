@@ -1,12 +1,13 @@
 import { motion } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
+import { HiOutlinePlay, HiOutlinePause } from "react-icons/hi";
 
 export default function SwipeCard({ track, swipeDirection, dragHandlers, controls }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
 
     const togglePlay = (e) => {
-        e.stopPropagation(); // Prevent drag interference
+        e.stopPropagation();
         if (audioRef.current) {
             if (isPlaying) {
                 audioRef.current.pause();
@@ -17,7 +18,6 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
         }
     };
 
-    // Reset audio state when track changes
     useEffect(() => {
         setIsPlaying(false);
         if (audioRef.current) {
@@ -32,115 +32,82 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
             dragConstraints={{ left: 0, right: 0 }}
             {...dragHandlers}
             animate={controls}
-            initial={{ scale: 0.9, opacity: 0, y: 50 }}
+            initial={{ scale: 0.95, opacity: 0, y: 20 }}
             whileInView={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="relative w-[360px] h-[600px] rounded-[48px] overflow-hidden cursor-grab active:cursor-grabbing group border border-white/10"
-            style={{
-                boxShadow: "0 40px 80px -20px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255,255,255,0.1)"
-            }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="relative w-full aspect-[3/4] max-h-[600px] rounded-[50px] overflow-hidden cursor-grab active:cursor-grabbing group shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10"
         >
-            {/* Full Bleed Album Art */}
-            <div className="absolute inset-0 bg-black">
+            {/* Grainy Texture */}
+            <div className="absolute inset-0 opacity-[0.05] pointer-events-none z-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+
+            {/* Album Art */}
+            <div className="absolute inset-0 bg-gray-900">
                 {track.coverImage ? (
                     <img
                         src={track.coverImage}
                         alt={track.name}
-                        className={`w-full h-full object-cover transition-transform duration-[800ms] ${isPlaying ? "scale-110" : "scale-100"}`}
+                        className={`w-full h-full object-cover transition-transform duration-[2000ms] ease-out ${isPlaying ? "scale-110" : "scale-100"}`}
                         draggable="false"
                     />
                 ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-900 via-purple-900 to-black flex items-center justify-center">
-                        <span className="text-white/30 font-medium">No Cover Art</span>
+                    <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+                        <span className="text-white/20 font-black uppercase tracking-widest text-xs">No Cover</span>
                     </div>
                 )}
-
-                {/* Cinematic Gradient Overlays */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90 pointer-events-none" />
+                {/* Overlays */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/90 z-0" />
             </div>
 
-            {/* Swipe Feedback Indicators */}
+            {/* Swipe Indicators */}
             {swipeDirection === "right" && (
-                <div className="absolute top-12 left-8 border-[6px] border-green-400 rounded-2xl px-6 py-2 transform -rotate-12 z-20 backdrop-blur-md bg-green-500/20 shadow-[0_0_50px_rgba(74,222,128,0.5)]">
-                    <span className="text-green-400 text-6xl font-black tracking-widest drop-shadow-lg uppercase">LIKE</span>
+                <div className="absolute top-10 left-10 border-4 border-[#1DB954] rounded-2xl px-6 py-2 -rotate-12 z-20 bg-[#1DB954]/20 backdrop-blur-md">
+                    <span className="text-[#1DB954] text-5xl font-black uppercase tracking-tighter">Like</span>
                 </div>
             )}
-
             {swipeDirection === "left" && (
-                <div className="absolute top-12 right-8 border-[6px] border-red-500 rounded-2xl px-6 py-2 transform rotate-12 z-20 backdrop-blur-md bg-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.5)]">
-                    <span className="text-red-500 text-6xl font-black tracking-widest drop-shadow-lg uppercase">NOPE</span>
+                <div className="absolute top-10 right-10 border-4 border-red-500 rounded-2xl px-6 py-2 rotate-12 z-20 bg-red-500/20 backdrop-blur-md">
+                    <span className="text-red-500 text-5xl font-black uppercase tracking-tighter">Nope</span>
                 </div>
             )}
 
-            {/* Super Like Indicator (Optional future feature placeholder) */}
-            {swipeDirection === "up" && (
-                <div className="absolute bottom-40 left-1/2 -translate-x-1/2 border-[6px] border-blue-400 rounded-2xl px-4 py-2 rotate-0 z-20 backdrop-blur-md bg-blue-500/20 shadow-[0_0_50px_rgba(96,165,250,0.5)]">
-                    <span className="text-blue-400 text-4xl font-black tracking-widest drop-shadow-lg uppercase">SUPER</span>
+            {/* Content Bottom */}
+            <div className="absolute bottom-0 inset-x-0 p-8 z-20 flex flex-col gap-6 bg-gradient-to-t from-black via-black/60 to-transparent pt-24">
+                <div className="space-y-1">
+                    <h1 className="text-4xl font-black text-white tracking-tighter line-clamp-1 group-hover:tracking-tight transition-all duration-500">
+                        {track.name}
+                    </h1>
+                    <p className="text-lg text-gray-300 font-bold uppercase tracking-widest text-xs opacity-80">
+                        {track.artist}
+                    </p>
                 </div>
-            )}
 
-            {/* Glassmorphism Info Card */}
-            <div className="absolute bottom-0 w-full z-10 flex flex-col justify-end pb-8 px-6 pt-24 bg-gradient-to-t from-black via-black/80 to-transparent">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={togglePlay}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="w-16 h-16 rounded-3xl bg-white text-black flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-all shadow-xl"
+                    >
+                        {isPlaying ? <HiOutlinePause /> : <HiOutlinePlay className="ml-1" />}
+                    </button>
 
-                <div className="relative">
-                    {/* Genre Tag */}
-                    {track.genre && (
-                        <div className="mb-4">
-                            <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[10px] font-bold text-white shadow-sm uppercase tracking-widest">
-                                {track.genre.split(',')[0]}
-                            </span>
-                        </div>
-                    )}
-
-                    {/* Track Details */}
-                    <div>
-                        <h1 className="text-4xl font-black text-white leading-none line-clamp-2 drop-shadow-2xl tracking-tighter mb-2">
-                            {track.name}
-                        </h1>
-                        <p className="text-xl text-white/80 font-medium tracking-wide">
-                            {track.artist}
-                        </p>
+                    <div className="flex-1 h-1 flex items-center gap-1">
+                        {[...Array(20)].map((_, i) => (
+                            <div
+                                key={i}
+                                className={`flex-1 rounded-full transition-all duration-500 ${isPlaying ? "animate-pulse bg-[#1DB954]" : "h-1 bg-white/20"}`}
+                                style={{
+                                    height: isPlaying ? `${Math.random() * 24 + 4}px` : "2px",
+                                    animationDelay: `${i * 0.05}s`
+                                }}
+                            />
+                        ))}
                     </div>
-
-                    {/* Custom Audio Player */}
-                    {track.previewUrl && (
-                        <div className="flex items-center gap-4 mt-6">
-                            <button
-                                onClick={togglePlay}
-                                onPointerDown={(e) => e.stopPropagation()} // Stop drag when clicking button
-                                className="relative w-14 h-14 flex-shrink-0 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] z-30 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]"
-                            >
-                                {isPlaying ? (
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                                        <path fillRule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0A.75.75 0 0115 4.5h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H15a.75.75 0 01-.75-.75V5.25z" clipRule="evenodd" />
-                                    </svg>
-                                ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 ml-0.5">
-                                        <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-                                    </svg>
-                                )}
-                            </button>
-
-                            {/* Visualizer / Waveform placeholder */}
-                            <div className="flex-1 h-12 flex items-center gap-1 opacity-70">
-                                {[...Array(16)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className={`w-1 rounded-full bg-white/80 transition-all duration-300 ${isPlaying ? "animate-pulse" : "h-1 bg-white/30"}`}
-                                        style={{
-                                            height: isPlaying ? `${Math.random() * 24 + 4}px` : "4px",
-                                            animationDelay: `${i * 0.05}s`
-                                        }}
-                                    />
-                                ))}
-                            </div>
-
-                            <audio ref={audioRef} src={track.previewUrl} onEnded={() => setIsPlaying(false)} className="hidden" />
-                        </div>
-                    )}
                 </div>
+
+                {track.previewUrl && (
+                    <audio ref={audioRef} src={track.previewUrl} onEnded={() => setIsPlaying(false)} className="hidden" />
+                )}
             </div>
         </motion.div>
     );

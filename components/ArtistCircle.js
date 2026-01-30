@@ -1,44 +1,45 @@
 export default function ArtistCircle({ artist, image, rank, size = 'md' }) {
     const sizeClasses = {
-        sm: "w-12 h-12",
-        md: "w-20 h-20",
-        lg: "w-32 h-32"
-    };
-
-    const containerClasses = {
-        sm: "min-w-[60px]",
-        md: "min-w-[80px]",
-        lg: "min-w-[140px]"
+        sm: "w-16 h-16",
+        md: "w-28 h-28",
+        lg: "w-40 h-40",
+        xl: "w-56 h-56"
     };
 
     const textSize = {
         sm: "text-[10px]",
         md: "text-xs",
-        lg: "text-sm"
+        lg: "text-sm",
+        xl: "text-lg"
     };
 
     return (
-        <div className={`flex flex-col items-center gap-2 group cursor-pointer ${containerClasses[size]}`}>
-            <div className={`relative ${sizeClasses[size]} rounded-full overflow-hidden border-2 border-transparent group-hover:border-green-500 transition-all shadow-lg group-hover:shadow-green-500/30 group-hover:scale-105`}>
-                {image ? (
-                    <img src={image} alt={artist} className="w-full h-full object-cover" />
-                ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-xl font-bold text-white">
-                        {artist[0]}
-                    </div>
-                )}
+        <div className="flex flex-col items-center gap-4 group cursor-pointer perspective-1000">
+            <div className={`relative ${sizeClasses[size] || sizeClasses.md} rounded-full overflow-hidden p-1.5 bg-gradient-to-tr from-white/10 to-transparent transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-2xl group-hover:shadow-[#1DB954]/20`}>
+                <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 border border-white/10">
+                    {image ? (
+                        <img src={image} alt={artist} className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-500" />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center text-4xl font-black text-white/20">
+                            {artist[0]}
+                        </div>
+                    )}
+                </div>
+
                 {/* Rank Badge for Top 3 */}
-                {rank && rank <= 3 && (
-                    <div className={`absolute top-0 right-0 ${size === 'sm' ? 'w-4 h-4 text-[8px]' : 'w-6 h-6 text-xs'} rounded-full flex items-center justify-center font-bold text-black border border-white
-                ${rank === 1 ? 'bg-yellow-400' : rank === 2 ? 'bg-gray-300' : 'bg-amber-600'}
-            `}>
+                {rank && rank <= 10 && (
+                    <div className={`absolute bottom-0 right-2 ${size === 'sm' ? 'w-5 h-5 text-[8px]' : 'w-8 h-8 text-xs'} bg-[#1DB954] rounded-full flex items-center justify-center font-black text-black border-2 border-black/80 shadow-lg transform group-hover:scale-110 transition-transform`}>
                         {rank}
                     </div>
                 )}
             </div>
-            <span className={`${textSize[size]} text-center text-gray-300 font-medium truncate w-full group-hover:text-white transition-colors`}>
-                {artist}
-            </span>
+
+            <div className="flex flex-col items-center">
+                <span className={`${textSize[size]} text-center text-white font-black tracking-tight uppercase truncate max-w-full opacity-80 group-hover:opacity-100 transition-opacity`}>
+                    {artist}
+                </span>
+                <span className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Artist</span>
+            </div>
         </div>
     );
 }

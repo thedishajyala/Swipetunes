@@ -22,13 +22,23 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white selection:bg-green-500 selection:text-black`}
       >
         <Providers>
-          <div className="flex min-h-screen bg-black text-white">
+          <div className="flex min-h-screen relative overflow-hidden">
+            {/* Ambient Background Spotlights */}
+            <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-500/10 blur-[120px] rounded-full pointer-events-none z-0" />
+            <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none z-0" />
+
+            {/* Grainy Texture */}
+            <div className="fixed inset-0 opacity-[0.15] pointer-events-none z-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+
             <Sidebar />
-            <main className="flex-1 ml-64 relative">
-              {children}
+
+            <main className="flex-1 ml-64 relative z-10 min-h-screen">
+              <div className="max-w-7xl mx-auto px-8 py-12">
+                {children}
+              </div>
             </main>
           </div>
         </Providers>
