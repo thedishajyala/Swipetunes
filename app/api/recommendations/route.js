@@ -77,10 +77,7 @@ export async function GET(req) {
         const seenIds = new Set();
         let validTracks = mixedRawTracks
             .filter(track => {
-                if (!track) return false;
-                // Strict rule: Recommendations MUST have audio. Top Tracks can be silent (visual).
-                const isMyTopTrack = topTracks.some(t => t.id === track.id);
-                if (!isMyTopTrack && !track.preview_url) return false;
+                if (!track || !track.preview_url) return false;
 
                 if (seenIds.has(track.id)) return false;
                 seenIds.add(track.id);
