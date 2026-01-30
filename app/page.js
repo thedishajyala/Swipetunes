@@ -15,16 +15,33 @@ export default function Home() {
   const controls = useAnimation();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ swipes: 0 });
+  const [userId, setUserId] = useState(null);
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (session?.user && session.accessToken) {
-      console.log("Home: Session ready, fetching data for user:", session.user.id);
-      fetchStats(session.user.id);
-      fetchTracks();
+    async function initUser() {
+      if (session?.user && session.accessToken) {
+        console.log("Home: Session ready, figuring out internal ID...");
+
+        // --- UUID RESOLVER ---
+        const lookupId = session.user.spotify_id || session.user.id;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('spotify_id', lookupId)
+          .maybeSingle();
+
+        const internalId = profile ? profile.id : session.user.id;
+        console.log("Home: Using internal UUID:", internalId);
+
+        setUserId(internalId);
+        fetchStats(internalId);
+        fetchTracks();
+      }
     }
+    initUser();
     if (status !== "loading") setLoading(false);
   }, [session, status]);
 
@@ -80,9 +97,10 @@ export default function Home() {
     setSwipeDirection(null);
     setCurrentIndex((prev) => prev + 1);
 
-    if (session?.user?.id && track) {
+    if ((userId || session?.user?.id) && track) {
+      const targetId = userId || session.user.id;
       await supabase.from('swipes').insert({
-        user_id: session.user.id,
+        user_id: targetId,
         track_id: track.id,
         liked: liked
       });

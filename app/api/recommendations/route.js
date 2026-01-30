@@ -16,6 +16,27 @@ export async function GET(req) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // --- UUID RESOLVER ---
+        // Get profile using spotify_id to ensure we use the internal UUID
+        // session.user.id might be a spotify_id string here depending on session status
+        const lookupId = session.user.spotify_id || session.user.id;
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from("profiles")
+            .select("id")
+            .eq("spotify_id", lookupId)
+            .maybeSingle();
+
+        if (profileError || !profile) {
+            console.warn("Recommendations API: Profile not found for spotify_id:", lookupId);
+            // Optionally we could create it here, but auth.js should have done it.
+            // For resilience, we'll continue using whatever is in session.user.id 
+            // but we'll flag it for debugging.
+        }
+
+        const userId = profile ? profile.id : session.user.id;
+        console.log("Recommendations API: Using internal userId:", userId);
+        // --- END UUID RESOLVER ---
+
         const spotifyApi = new SpotifyWebApi({
             clientId: process.env.SPOTIFY_CLIENT_ID,
             clientSecret: process.env.SPOTIFY_CLIENT_SECRET,

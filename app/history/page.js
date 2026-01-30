@@ -11,11 +11,22 @@ export default function History() {
             const { data: { session } } = await supabase.auth.getSession();
 
             if (session) {
+                // --- UUID RESOLVER ---
+                const lookupId = session.user.id; // Usually spotify_id in history
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('spotify_id', lookupId)
+                    .maybeSingle();
+
+                const userId = profile ? profile.id : lookupId;
+                console.log("History: Using resolved userId:", userId);
+
                 // 1. Get liked swipes
                 const { data: swipes, error: swipesError } = await supabase
                     .from('swipes')
                     .select('track_id')
-                    .eq('user_id', session.user.id)
+                    .eq('user_id', userId)
                     .eq('liked', true);
 
                 if (swipes && swipes.length > 0) {
