@@ -1,22 +1,63 @@
-"use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import toast from "react-hot-toast";
+import { supabase } from "@/lib/supabase";
 import {
-    HiOutlineMusicNote,
-    HiOutlineUserCircle,
-    HiOutlineLightningBolt,
-    HiOutlineClock,
-    HiOutlineLogout
+    HiOutlineLogout,
+    HiOutlineUserGroup,
+    HiOutlineFire, // Added for Feed icon
+    HiOutlineChatAlt2, // Added for Chat icon
+    HiOutlineBookOpen // Added for Journal icon
 } from "react-icons/hi";
+import { HiOutlineMusicNote, HiOutlineUserCircle, HiOutlineLightningBolt, HiOutlineClock, HiOutlineTicket } from "react-icons/hi";
+
 
 export default function Sidebar() {
-    const pathname = usePathname();
     const { data: session } = useSession();
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        if (session?.user?.id) {
+            fetchUnreadCount();
+
+            const channel = supabase
+                .channel('global_notifications')
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `receiver_id=eq.${session.user.id}`
+                }, (payload) => {
+                    setUnreadCount(prev => prev + 1);
+                    toast(`New message from a curator!`, { icon: '💬' });
+                })
+                .subscribe();
+
+            return () => { supabase.removeChannel(channel); }
+        }
+    }, [session]);
+
+    async function fetchUnreadCount() {
+        const { count, error } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('receiver_id', session.user.id)
+            .eq('read_status', false);
+
+        if (!error) setUnreadCount(count || 0);
+    }
 
     const navItems = [
         { name: "Swipe", path: "/", icon: <HiOutlineMusicNote size={24} /> },
         { name: "My Identity", path: "/profile", icon: <HiOutlineUserCircle size={24} /> },
+        { name: "Feed", path: "/feed", icon: <HiOutlineFire size={24} /> },
+        { name: "Messages", path: "/chat", icon: <HiOutlineChatAlt2 size={24} /> },
+        { name: "Journal", path: "/journal", icon: <HiOutlineBookOpen size={24} /> },
+        { name: "Trends", path: "/trends", icon: <HiOutlineFire size={24} /> },
+        { name: "Discover", path: "/discover", icon: <HiOutlineUserGroup size={24} /> },
+        { name: "Events", path: "/events", icon: <HiOutlineTicket size={24} /> },
         { name: "Matches", path: "/recommendations", icon: <HiOutlineLightningBolt size={24} /> },
         { name: "History", path: "/history", icon: <HiOutlineClock size={24} /> },
     ];
@@ -51,6 +92,11 @@ export default function Sidebar() {
                                 {item.icon}
                             </span>
                             <span className="font-bold tracking-tight">{item.name}</span>
+                            {item.name === "Messages" && unreadCount > 0 && (
+                                <span className="ml-auto w-5 h-5 bg-[#1DB954] text-black text-[10px] font-black rounded-full flex items-center justify-center">
+                                    {unreadCount}
+                                </span>
+                            )}
                         </Link>
                     );
                 })}

@@ -28,7 +28,7 @@ export default function Home() {
         // --- UUID RESOLVER ---
         const lookupId = session.user.spotify_id || session.user.id;
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('users')
           .select('id')
           .eq('spotify_id', lookupId)
           .maybeSingle();
@@ -99,12 +99,56 @@ export default function Home() {
 
     if ((userId || session?.user?.id) && track) {
       const targetId = userId || session.user.id;
+
+      // 1. Record the swipe
       await supabase.from('swipes').insert({
         user_id: targetId,
         track_id: track.id,
         liked: liked
       });
-      if (liked) setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
+
+      // 2. If liked, upsert to 'songs' table for social feed
+      if (liked) {
+        setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
+
+        try {
+          // Fetch existing song to update liked_by array
+          const { data: existingSong } = await supabase
+            .from('songs')
+            .select('liked_by')
+            .eq('track_id', track.id)
+            .maybeSingle();
+
+          const currentLikers = existingSong?.liked_by || [];
+          if (!currentLikers.includes(targetId)) {
+            const newLikers = [...currentLikers, targetId];
+
+            await supabase.from('songs').upsert({
+              track_id: track.id,
+              title: track.name,
+              artist: track.artists[0]?.name,
+              album: track.album?.name,
+              cover_url: track.album?.images[0]?.url,
+              liked_by: newLikers,
+              created_at: new Date().toISOString()
+            });
+
+            // Reward XP for liking a song
+            fetch('/api/gamification', {
+              method: 'POST',
+              body: JSON.stringify({ action: 'swipe_like' })
+            });
+
+            // Add to Music Journal
+            fetch('/api/journal', {
+              method: 'POST',
+              body: JSON.stringify({ track_id: track.id, action: 'liked' })
+            });
+          }
+        } catch (e) {
+          console.error("Home: Failed to sync social song:", e);
+        }
+      }
     }
   };
 

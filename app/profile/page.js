@@ -1,146 +1,337 @@
 'use client';
 
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { HiOutlineSparkles, HiOutlineGlobe, HiOutlineUserGroup, HiOutlineFire } from "react-icons/hi";
+import { motion, AnimatePresence } from "framer-motion";
+import { getTopTracks, getTopArtists, getCurrentlyPlaying } from "@/lib/spotify";
 import ArtistGrid from "@/components/ArtistGrid";
-import SpotifyLogin from "@/components/SpotifyLogin";
-
-// Mock Data for "Music Identity"
-const TOP_ARTISTS = [
-    { name: "The Weeknd", image: "https://i.scdn.co/image/ab6761610000e5eb214f30c68726591244415891" },
-    { name: "SZA", image: "https://i.scdn.co/image/ab6761610000e5eb703816998fa632ed68615c32" }, // SZA still seems okay sometimes but I'll use a better one if needed. Actually SZA ab6761610000e5eb703816998fa632ed68615c32 is valid.
-    { name: "Drake", image: "https://i.scdn.co/image/ab6761610000e5eb42da6707328df8f2603f9012" }, // If this 404s, I'll update it.
-    { name: "Lana Del Rey", image: "https://i.scdn.co/image/ab67616d0000b273b796b334bc0e0081079bc081" },
-    { name: "Metro Boomin", image: "https://i.scdn.co/image/ab6761610000e5eb051ae8df8643806a72e7372b" },
-];
-
-const RECENT_LIKES = [
-    { id: 1, title: "Starboy", author: "The Weeknd", cover: "https://upload.wikimedia.org/wikipedia/en/3/39/The_Weeknd_-_Starboy.png" },
-    { id: 2, title: "Kill Bill", author: "SZA", cover: "https://upload.wikimedia.org/wikipedia/en/2/2c/SZA_-_SOS.png" },
-    { id: 3, title: "As It Was", author: "Harry Styles", cover: "https://upload.wikimedia.org/wikipedia/en/d/d5/Harry_Styles_-_As_It_Was.png" },
-];
+import {
+    HiOutlineUserCircle, HiOutlineUsers, HiOutlineUserAdd, HiOutlineCheck,
+    HiOutlineX, HiOutlineGlobeAlt, HiOutlineLightningBolt, HiOutlineHeart,
+    HiOutlineFire, HiOutlineSparkles, HiOutlineStar, HiOutlineUserGroup,
+    HiOutlineMusicNote
+} from "react-icons/hi";
+import { supabase } from "@/lib/supabase";
+import toast from "react-hot-toast";
 
 export default function ProfilePage() {
     const { data: session, status } = useSession();
+    const [stats, setStats] = useState({ xp: 0, level: 1, streak_count: 0 });
+    const [achievements, setAchievements] = useState([]);
+    const [topTracks, setTopTracks] = useState([]);
+    const [topArtists, setTopArtists] = useState([]);
+    const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
+    const [followersCount, setFollowersCount] = useState(0);
+    const [followingCount, setFollowingCount] = useState(0);
+    const [requests, setRequests] = useState([]);
+    const [tasteProfile, setTasteProfile] = useState(null);
+    const [challenges, setChallenges] = useState([]);
+    const [recalculating, setRecalculating] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    if (status === "loading") {
-        return (
-            <div className="flex h-[80vh] items-center justify-center">
-                <div className="w-12 h-12 border-4 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
+    useEffect(() => {
+        async function fetchProfileData() {
+            if (session?.accessToken && session.user?.id) {
+                try {
+                    const [tracksData, artistsData, playingData] = await Promise.all([
+                        getTopTracks(session.accessToken, 'medium_term', 5),
+                        getTopArtists(session.accessToken, 'medium_term', 5),
+                        getCurrentlyPlaying(session.accessToken)
+                    ]);
+
+                    const gamificationRes = await fetch('/api/gamification');
+                    const gamificationData = await gamificationRes.json();
+                    if (gamificationData.stats) setStats(gamificationData.stats);
+                    if (gamificationData.achievements) setAchievements(gamificationData.achievements);
+
+                    setTopTracks(tracksData.items || []);
+                    setTopArtists(artistsData.items.map(a => ({
+                        name: a.name,
+                        image: a.images[0]?.url,
+                        genres: a.genres
+                    })));
+                    setCurrentlyPlaying(playingData);
+
+                    const [followersData, followingData, requestsData] = await Promise.all([
+                        supabase.from('followers').select('*', { count: 'exact', head: true }).eq('friend_id', session.user.id).eq('status', 'accepted'),
+                        supabase.from('followers').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('status', 'accepted'),
+                        supabase.from('followers').select('*, users!user_id(id, display_name, profile_pic_url)').eq('friend_id', session.user.id).eq('status', 'pending')
+                    ]);
+
+                    setFollowersCount(followersData.count || 0);
+                    setFollowingCount(followingData.count || 0);
+                    setRequests(requestsData.data || []);
+
+                    const { data: tasteData } = await supabase
+                        .from('user_taste_profile')
+                        .select('*')
+                        .eq('user_id', session.user.id)
+                        .single();
+                    if (tasteData) setTasteProfile(tasteData);
+
+                    const challengesRes = await fetch('/api/challenges');
+                    const challengesData = await challengesRes.json();
+                    if (Array.isArray(challengesData)) setChallenges(challengesData);
+                } catch (error) {
+                    console.error("Error fetching profile data:", error);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        }
+        fetchProfileData();
+
+        const channel = supabase
+            .channel('profile_requests')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'followers',
+                filter: `friend_id=eq.${session?.user?.id}`
+            }, () => fetchProfileData())
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [session, status]);
+
+    async function recalculateVibe() {
+        setRecalculating(true);
+        try {
+            const res = await fetch('/api/profile/recalculate', { method: 'POST' });
+            const data = await res.json();
+            if (data.mood_tag) {
+                setTasteProfile(data);
+                toast.success(`Identity Updated: ${data.mood_tag}`);
+                // Add XP for updating identity
+                fetch('/api/gamification', { method: 'POST', body: JSON.stringify({ action: 'daily_streak' }) });
+            } else if (data.message) {
+                toast(data.message, { icon: '🔍' });
+            }
+        } catch (e) {
+            toast.error("Vibe recalibration failed.");
+        } finally {
+            setRecalculating(false);
+        }
     }
 
-    if (!session) {
-        return (
-            <div className="flex h-[80vh] flex-col items-center justify-center gap-8 text-center max-w-2xl mx-auto px-6">
-                <div className="w-24 h-24 bg-gradient-to-tr from-green-500/20 to-blue-500/20 rounded-full flex items-center justify-center animate-bounce">
-                    <HiOutlineSparkles className="text-4xl text-[#1DB954]" />
-                </div>
-                <div>
-                    <h1 className="text-5xl font-black tracking-tighter mb-4 text-white">Your Music Identity</h1>
-                    <p className="text-xl text-gray-400 font-medium">Join the community to visualize your taste, track your stats, and see what the world is listening to.</p>
-                </div>
-                <SpotifyLogin />
-            </div>
-        );
+    async function handleRequest(requestId, status) {
+        try {
+            if (status === 'accepted') {
+                await supabase.from('followers').update({ status: 'accepted' }).eq('id', requestId);
+                toast.success("Request accepted!");
+            } else {
+                await supabase.from('followers').delete().eq('id', requestId);
+                toast.error("Request rejected.");
+            }
+            setRequests(prev => prev.filter(r => r.id !== requestId));
+        } catch (error) {
+            console.error("Error handling request:", error);
+        }
     }
+
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-sm font-black uppercase tracking-[0.3em] opacity-20 animate-pulse">Scanning Identity...</div>
+        </div>
+    );
 
     return (
-        <div className="space-y-16 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
-
-            {/* Identity Header */}
-            <header className="relative py-12 flex flex-col items-center text-center overflow-hidden rounded-[40px] bg-white/[0.02] border border-white/5">
-                <div className="absolute inset-0 bg-gradient-to-b from-[#1DB954]/10 to-transparent pointer-events-none" />
-
-                <div className="relative mb-6">
-                    <div className="w-40 h-40 rounded-full p-2 bg-gradient-to-tr from-[#1DB954] to-[#1ed760] shadow-2xl">
+        <div className="max-w-7xl mx-auto space-y-16 py-12 px-6">
+            <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative"
+            >
+                <div className="flex flex-col md:flex-row items-center gap-12">
+                    <div className="relative group">
+                        <div className="absolute -inset-4 bg-gradient-to-r from-[#1DB954] to-[#19e68c] rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
                         <img
-                            src={session.user.image}
-                            alt={session.user.name}
-                            className="w-full h-full rounded-full border-4 border-black object-cover"
+                            src={session?.user?.image || "https://www.gravatar.com/avatar?d=mp"}
+                            className="w-48 h-48 rounded-full object-cover border-4 border-white/5 relative z-10"
+                        />
+                        <div className="absolute bottom-2 right-2 bg-[#1DB954] p-3 rounded-2xl shadow-xl z-20">
+                            <HiOutlineGlobeAlt className="text-black text-xl" />
+                        </div>
+                    </div>
+
+                    <div className="flex-1 text-center md:text-left space-y-4">
+                        <h1 className="text-7xl font-black text-white tracking-tighter mb-2">
+                            {session?.user?.name}
+                        </h1>
+                        <div className="flex flex-wrap justify-center md:justify-start gap-8">
+                            <div className="flex flex-col">
+                                <span className="text-3xl font-black text-white">{followersCount}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Followers</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-3xl font-black text-white">{followingCount}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[#1DB954]">Following</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-3xl font-black text-white">{requests.length}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">Pending</span>
+                            </div>
+                        </div>
+
+                        {/* AI Vibe Badge */}
+                        <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-6">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-white/5 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-md"
+                            >
+                                <div className="text-xl">
+                                    {tasteProfile?.mood_tag?.includes('🌙') ? '🌙' :
+                                        tasteProfile?.mood_tag?.includes('⚡') ? '⚡' :
+                                            tasteProfile?.mood_tag?.includes('✨') ? '✨' :
+                                                tasteProfile?.mood_tag?.includes('☕') ? '☕' : '🎧'}
+                                </div>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Current AI Vibe</span>
+                                    <span className="text-sm font-black text-[#1DB954] tracking-tight truncate max-w-[150px]">
+                                        {tasteProfile?.mood_tag || "Scanning Identity..."}
+                                    </span>
+                                </div>
+                            </motion.div>
+
+                            <button
+                                onClick={recalculateVibe}
+                                disabled={recalculating}
+                                className={`p-4 bg-white/5 border border-white/10 rounded-2xl text-gray-400 hover:text-white hover:bg-white/10 transition-all ${recalculating ? 'animate-spin' : ''}`}
+                                title="Recalculate Vibe"
+                            >
+                                <HiOutlineLightningBolt />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Follow Requests Portal */}
+                <AnimatePresence>
+                    {requests.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="mt-12 bg-white/[0.03] border border-white/10 rounded-[40px] p-8"
+                        >
+                            <h3 className="text-xl font-black text-white tracking-tighter mb-6 flex items-center gap-3">
+                                <HiOutlineUsers className="text-[#1DB954]" /> Pending Connections
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {requests.map(req => (
+                                    <div key={req.id} className="flex items-center justify-between bg-black/40 p-4 rounded-3xl border border-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <img src={req.users.profile_pic_url || "https://www.gravatar.com/avatar?d=mp"} className="w-10 h-10 rounded-full" />
+                                            <span className="font-bold text-sm text-white truncate max-w-[100px]">{req.users.display_name}</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => handleRequest(req.id, 'accepted')} className="p-2 bg-[#1DB954] text-black rounded-xl hover:scale-105 transition-all"><HiOutlineCheck /></button>
+                                            <button onClick={() => handleRequest(req.id, 'rejected')} className="p-2 bg-white/10 text-white rounded-xl hover:scale-105 transition-all"><HiOutlineX /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </motion.section>
+
+            {/* Gamification Dashboard */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white/5 border border-white/10 p-8 rounded-[40px] flex flex-col items-center">
+                    <div className="w-16 h-16 bg-[#1DB954] text-black rounded-3xl flex items-center justify-center text-3xl font-black mb-4 shadow-xl shadow-[#1DB954]/20">
+                        {stats.level}
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-2">Identity Level</span>
+                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-2">
+                        <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(stats.xp % 500) / 5}%` }}
+                            className="h-full bg-gradient-to-r from-[#1DB954] to-[#19e68c]"
                         />
                     </div>
-                    <div className="absolute -bottom-2 -right-2 bg-white text-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-xl">
-                        Verified Taste
-                    </div>
+                    <span className="text-[10px] font-black uppercase text-gray-400 opacity-60">{stats.xp % 500} / 500 XP to next level</span>
                 </div>
-
-                <h1 className="text-6xl font-black tracking-tighter text-white mb-2">{session.user.name}</h1>
-                <p className="text-gray-500 font-bold uppercase tracking-[0.2em] text-xs">Aesthetic Curator</p>
-
-                {/* Quick Stats Banner */}
-                <div className="flex gap-12 mt-10 p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-md">
-                    <div className="flex flex-col">
-                        <span className="text-2xl font-black text-white">1.2k</span>
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Swipes</span>
-                    </div>
-                    <div className="w-px h-full bg-white/10" />
-                    <div className="flex flex-col">
-                        <span className="text-2xl font-black text-white">45</span>
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Matches</span>
-                    </div>
-                    <div className="w-px h-full bg-white/10" />
-                    <div className="flex flex-col">
-                        <span className="text-2xl font-black text-white">Top 1%</span>
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Taste</span>
-                    </div>
-                </div>
-            </header>
-
-            {/* Top Artists (The "Circle Grid" Look) */}
-            <section className="relative">
-                <div className="flex items-end justify-between mb-10">
-                    <div>
-                        <h2 className="text-4xl font-black text-white tracking-tighter mb-2">Soulmates in Sound</h2>
-                        <p className="text-gray-500 font-medium">Artists that define your current aesthetic path.</p>
-                    </div>
-                    <HiOutlineFire className="text-3xl text-orange-500 animate-pulse" />
-                </div>
-                <ArtistGrid artists={TOP_ARTISTS} />
             </section>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                {/* Community Pulse */}
-                <section className="p-8 rounded-[40px] bg-white/[0.02] border border-white/5">
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center">
-                            <HiOutlineGlobe className="text-blue-500 text-xl" />
-                        </div>
-                        <h2 className="text-2xl font-black text-white tracking-tight">Community Pulse</h2>
-                    </div>
+            {/* Weekly Challenges Portal */}
+            <section className="space-y-8">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
+                        <HiOutlineLightningBolt className="text-[#1DB954]" /> Weekly Rotations
+                    </h3>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Resets in 4 Days</span>
+                </div>
 
-                    <div className="space-y-4">
-                        {RECENT_LIKES.map((song) => (
-                            <div key={song.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors group cursor-pointer">
-                                <img src={song.cover} className="w-16 h-16 rounded-xl shadow-lg group-hover:scale-105 transition-transform" />
-                                <div className="flex-1">
-                                    <h3 className="font-black text-white">{song.title}</h3>
-                                    <p className="text-xs text-gray-500 font-bold">{song.author}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {challenges.map((challenge, i) => (
+                        <div key={challenge.id} className="relative bg-white/5 border border-white/10 p-6 rounded-3xl overflow-hidden group">
+                            {challenge.is_completed && (
+                                <div className="absolute inset-0 bg-[#1DB954]/10 backdrop-blur-sm flex items-center justify-center z-10">
+                                    <div className="bg-[#1DB954] text-black px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest shadow-lg rotate-3">Mission Complete</div>
                                 </div>
-                                <div className="text-[10px] font-black text-[#1DB954] bg-green-500/10 px-2 py-1 rounded-md uppercase">
-                                    98% Match
+                            )}
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 className="font-bold text-white text-lg">{challenge.title}</h4>
+                                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-widest mt-1">Goal: {challenge.target} {challenge.type}s</p>
+                                </div>
+                                <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-xl">
+                                    {challenge.type === 'liked' ? '❤️' : challenge.type === 'shared' ? '🔗' : '🔥'}
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </section>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                                    <span className="text-gray-500">Progress</span>
+                                    <span className="text-[#1DB954]">{challenge.progress} / {challenge.target}</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${Math.min(100, (challenge.progress / challenge.target) * 100)}%` }}
+                                        className="h-full bg-[#1DB954]"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {challenges.length === 0 && (
+                        <div className="col-span-full py-12 bg-white/5 rounded-3xl border border-white/5 border-dashed flex flex-col items-center justify-center text-gray-500">
+                            <span className="text-sm font-bold">No active challenges.</span>
+                            <span className="text-[10px] uppercase tracking-widest mt-2">Check back during the next peak cycle.</span>
+                        </div>
+                    )}
+                </div>
+            </section>
 
-                {/* Vibe Profile */}
-                <section className="p-8 rounded-[40px] bg-gradient-to-br from-[#1DB954]/20 to-blue-500/20 border border-white/10 flex flex-col justify-center items-center text-center relative overflow-hidden">
-                    <div className="absolute top-[-20%] right-[-20%] w-64 h-64 bg-white/10 blur-[60px] rounded-full" />
+            <section className="space-y-12">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-4xl font-black text-white tracking-tighter">Current Rotations</h2>
+                    <HiOutlineFire className="text-[#1DB954] text-4xl" />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                    {topTracks.map((track, i) => (
+                        <div key={track.id} className="flex flex-col gap-4 p-5 rounded-[30px] bg-white/[0.03] hover:bg-white/10 transition-all group cursor-pointer border border-white/5 shadow-xl">
+                            <div className="relative aspect-square overflow-hidden rounded-2xl shadow-lg">
+                                <img src={track.album?.images[0]?.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <HiOutlineHeart className="text-white text-3xl" />
+                                </div>
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-white truncate">{track.name}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[#1DB954] truncate mt-1">{track.artists[0]?.name}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
 
-                    <HiOutlineSparkles className="text-5xl text-white mb-6 animate-spin-slow" />
-                    <h2 className="text-3xl font-black text-white tracking-tighter mb-4">Hypnotic & Cinematic</h2>
-                    <p className="text-gray-300 font-medium leading-relaxed">
-                        Your taste leans towards rich textures and atmospheric production. You prefer music that tells a story through soundscapes.
-                    </p>
-
-                    <button className="mt-8 px-8 py-3 bg-white text-black font-black rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform">
-                        Share Identity
-                    </button>
-                </section>
-            </div>
+            <section className="space-y-12">
+                <h2 className="text-4xl font-black text-white tracking-tighter">Aesthetic Influences</h2>
+                <ArtistGrid artists={topArtists} />
+            </section>
         </div>
     );
 }

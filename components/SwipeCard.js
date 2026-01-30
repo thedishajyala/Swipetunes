@@ -1,6 +1,5 @@
-import { motion } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
-import { HiOutlinePlay, HiOutlinePause } from "react-icons/hi";
+import { HiOutlinePlay, HiOutlinePause, HiOutlineShare } from "react-icons/hi";
 
 export default function SwipeCard({ track, swipeDirection, dragHandlers, controls }) {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -66,10 +65,10 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
 
             {/* Album Art */}
             <div className="absolute inset-0 bg-gray-900">
-                {track.coverImage ? (
+                {(track.coverImage || track.cover_url || (track.album?.images && track.album.images[0]?.url)) ? (
                     <img
-                        src={track.coverImage}
-                        alt={track.name}
+                        src={track.coverImage || track.cover_url || track.album?.images[0]?.url}
+                        alt={track.name || track.title}
                         className={`w-full h-full object-cover transition-transform duration-[2000ms] ease-out ${isPlaying ? "scale-110" : "scale-100"}`}
                         draggable="false"
                         onError={(e) => {
@@ -101,10 +100,10 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
             <div className="absolute bottom-0 inset-x-0 p-8 z-20 flex flex-col gap-6 bg-gradient-to-t from-black via-black/60 to-transparent pt-24">
                 <div className="space-y-1">
                     <h1 className="text-4xl font-black text-white tracking-tighter line-clamp-1 group-hover:tracking-tight transition-all duration-500">
-                        {track.name}
+                        {track.name || track.title}
                     </h1>
                     <p className="text-lg text-gray-300 font-bold uppercase tracking-widest text-xs opacity-80">
-                        {track.artist}
+                        {track.artist || (track.artists && track.artists[0]?.name)}
                     </p>
                 </div>
 
@@ -115,6 +114,19 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                         className="w-16 h-16 rounded-3xl bg-white text-black flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-all shadow-xl"
                     >
                         {isPlaying ? <HiOutlinePause /> : <HiOutlinePlay className="ml-1" />}
+                    </button>
+
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const trackId = track.id || track.track_id;
+                            window.dispatchEvent(new CustomEvent('share-track', { detail: { trackId, track } }));
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-xl transition-all"
+                        title="Share with curator"
+                    >
+                        <HiOutlineShare />
                     </button>
 
                     <div className="flex-1 h-1 flex items-center gap-1">
