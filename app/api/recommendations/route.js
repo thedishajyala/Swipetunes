@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { getTopTracks, getTopArtists, getRecommendations } from "@/lib/spotify";
+import { getTopTracks, getTopArtists, getRecommendations, getRecentlyPlayed, getMySavedTracks } from "@/lib/spotify";
 import { FALLBACK_CATALOG } from "@/lib/fallback-catalog";
 
 export async function GET(req) {
@@ -12,21 +12,33 @@ export async function GET(req) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // 1. Fetch Top Tracks (User Favorites)
+        // 1. Parallel Fetch: Top Tracks (50) + Recent (50) + Saved (50)
+        // This maximizes our chances of finding playable audio.
         let topTracks = [];
-        let topTracksError = null;
-        try {
-            const topTracksData = await getTopTracks(session.accessToken, 'short_term', 50);
-            if (topTracksData.error) { // Check for API error response
-                throw new Error(topTracksData.error.message || "Spotify API Error");
-            }
-            topTracks = topTracksData.items || [];
-        } catch (err) {
-            console.error("Recs API: Spotify Top Tracks fetch failed.", err);
-            topTracksError = err.message;
+        let recentTracks = [];
+        let savedTracks = [];
+        let apiError = null;
+
+        const [topData, recentData, savedData] = await Promise.allSettled([
+            getTopTracks(session.accessToken, 'short_term', 50),
+            getRecentlyPlayed(session.accessToken, 50),
+            getMySavedTracks(session.accessToken, 50)
+        ]);
+
+        if (topData.status === 'fulfilled') topTracks = topData.value.items || [];
+        else apiError = topData.reason.message;
+
+        if (recentData.status === 'fulfilled') {
+            // Recent tracks structure is different: item.track
+            recentTracks = recentData.value.items?.map(item => item.track) || [];
         }
 
-        // 2. Fetch Top Artists (Backup Seeds) - Limit 5
+        if (savedData.status === 'fulfilled') {
+            // Saved tracks structure: item.track
+            savedTracks = savedData.value.items?.map(item => item.track) || [];
+        }
+
+        // 2. Fetch Top Artists (Backup Seeds)
         let topArtists = [];
         try {
             const topArtistsData = await getTopArtists(session.accessToken, 'short_term', 5);
@@ -35,38 +47,20 @@ export async function GET(req) {
             console.warn("Recs API: Spotify Top Artists fetch failed.", err);
         }
 
-        // 3. Prepare Seeds
-        let seedTrackIds = topTracks.map(t => t.id).slice(0, 3);
-        let seedArtistIds = topArtists.map(a => a.id).slice(0, 2);
-
-        // Fallback seeds if user has no history
-        if (seedTrackIds.length === 0 && seedArtistIds.length === 0) {
-            // Use 'The Weeknd' (artist) and 'Blinding Lights' (track) as generic global seeds
-            seedArtistIds = ['1Xyo4u8uXC1ZmMpatF05PJ'];
-            seedTrackIds = ['0VjIjW4GlUZAMYd2vXMi3b'];
-        }
+        // 3. Prepare Seeds from Top Tracks
+        const validTrackSeeds = topTracks.slice(0, 5).map(t => t.id);
+        const finalSeeds = validTrackSeeds.length > 0 ? validTrackSeeds : ['0VjIjW4GlUZAMYd2vXMi3b'];
 
         // 4. Get New Recommendations
         let recs = [];
         try {
-            // Smart mixing of seeds: prioritize tracks, but use artist if needed
-            const seeds = [...seedTrackIds, ...seedArtistIds].slice(0, 5); // Max 5 seeds allowed
-
-            // We strictly need VALID seeds. 
-            // If we mix types, we need to be careful. The library function uses `seed_tracks` hardcoded?
-            // Checking library... yes, it uses `seed_tracks: seedTracks.join(',')`. 
-            // FIX: We must pass strictly TRACK IDs if the lib function is hardcoded for tracks.
-            // Actually, the lib function logic: `const params = new URLSearchParams({ seed_tracks: seedTracks.join(','), ...options });`
-            // So if we pass artist IDs as 'seed_tracks', it will fail.
-            // We should just use TRACK IDs from top tracks. If we have 0 top tracks, we use fallback track seeds.
-
-            const validTrackSeeds = topTracks.slice(0, 5).map(t => t.id);
-            const finalSeeds = validTrackSeeds.length > 0 ? validTrackSeeds : ['0VjIjW4GlUZAMYd2vXMi3b'];
-
             recs = await getRecommendations(session.accessToken, finalSeeds, { limit: 50 });
         } catch (spotifyErr) {
             console.error("Recs API: Spotify Recommendations failed:", spotifyErr.message);
         }
+
+        // 5. COMBINE ALL SOURCES
+        const mixedRawTracks = [...topTracks, ...recentTracks, ...savedTracks, ...recs];
 
         // 5. COMBINE: My Top Songs + New Discoveries
         // The user wants to see their top songs too!
@@ -121,11 +115,11 @@ export async function GET(req) {
         }
 
         // 9. If we have NO valid tracks and it was an API error, tell the user
-        if (validTracks.length === 0 && topTracksError) {
+        if (validTracks.length === 0 && apiError) {
             return NextResponse.json({
                 error: "Start Swiping Failed",
                 details: "We couldn't fetch your music. Please Sign Out and Sign In again to update permissions.",
-                debug_info: topTracksError
+                debug_info: apiError
             }, { status: 403 });
         }
 
