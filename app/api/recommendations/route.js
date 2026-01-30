@@ -12,13 +12,18 @@ export async function GET(req) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // 1. Fetch Top Tracks (User Favorites) - Limit 50
+        // 1. Fetch Top Tracks (User Favorites)
         let topTracks = [];
+        let topTracksError = null;
         try {
             const topTracksData = await getTopTracks(session.accessToken, 'short_term', 50);
+            if (topTracksData.error) { // Check for API error response
+                throw new Error(topTracksData.error.message || "Spotify API Error");
+            }
             topTracks = topTracksData.items || [];
         } catch (err) {
-            console.warn("Recs API: Spotify Top Tracks fetch failed.", err);
+            console.error("Recs API: Spotify Top Tracks fetch failed.", err);
+            topTracksError = err.message;
         }
 
         // 2. Fetch Top Artists (Backup Seeds) - Limit 5
@@ -55,7 +60,7 @@ export async function GET(req) {
             // So if we pass artist IDs as 'seed_tracks', it will fail.
             // We should just use TRACK IDs from top tracks. If we have 0 top tracks, we use fallback track seeds.
 
-            const validTrackSeeds = topTracks.map(t => t.id).slice(0, 5);
+            const validTrackSeeds = topTracks.slice(0, 5).map(t => t.id);
             const finalSeeds = validTrackSeeds.length > 0 ? validTrackSeeds : ['0VjIjW4GlUZAMYd2vXMi3b'];
 
             recs = await getRecommendations(session.accessToken, finalSeeds, { limit: 50 });
@@ -67,12 +72,16 @@ export async function GET(req) {
         // The user wants to see their top songs too!
         const mixedRawTracks = [...topTracks, ...recs];
 
-        // 6. Strict Filtering: MUST Have Preview URL
+        // 6. Filter: Require Preview URL for Recommendations, but ALLOW Top Tracks without it (visual only)
         // We Deduplicate by ID
         const seenIds = new Set();
         let validTracks = mixedRawTracks
             .filter(track => {
-                if (!track || !track.preview_url) return false;
+                if (!track) return false;
+                // Strict rule: Recommendations MUST have audio. Top Tracks can be silent (visual).
+                const isMyTopTrack = topTracks.some(t => t.id === track.id);
+                if (!isMyTopTrack && !track.preview_url) return false;
+
                 if (seenIds.has(track.id)) return false;
                 seenIds.add(track.id);
                 return true;
@@ -112,6 +121,15 @@ export async function GET(req) {
             } catch (catalogErr) {
                 // Silent fail
             }
+        }
+
+        // 9. If we have NO valid tracks and it was an API error, tell the user
+        if (validTracks.length === 0 && topTracksError) {
+            return NextResponse.json({
+                error: "Start Swiping Failed",
+                details: "We couldn't fetch your music. Please Sign Out and Sign In again to update permissions.",
+                debug_info: topTracksError
+            }, { status: 403 });
         }
 
         return NextResponse.json(validTracks);
