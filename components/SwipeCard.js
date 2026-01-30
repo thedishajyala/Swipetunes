@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { HiOutlinePlay, HiOutlinePause, HiOutlineShare, HiVolumeUp } from "react-icons/hi";
+import { HiOutlinePlay, HiOutlinePause, HiOutlineShare, HiVolumeUp, HiVolumeOff } from "react-icons/hi";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function SwipeCard({ track, swipeDirection, dragHandlers, controls }) {
@@ -29,6 +29,7 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
     };
 
     const previewSrc = track.previewUrl || track.preview_url;
+    const hasAudio = !!previewSrc;
 
     useEffect(() => {
         setIsPlaying(false);
@@ -94,9 +95,9 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/90 z-0" />
             </div>
 
-            {/* Tap to Listen Overlay (If Autoplay Blocked) */}
+            {/* Tap to Listen Overlay (If Autoplay Blocked AND Audio Exists) */}
             <AnimatePresence>
-                {showInteractionPrompt && (
+                {showInteractionPrompt && hasAudio && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -137,11 +138,15 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
 
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={togglePlay}
+                        onClick={hasAudio ? togglePlay : undefined}
                         onPointerDown={(e) => e.stopPropagation()}
-                        className="w-16 h-16 rounded-3xl bg-white text-black flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-all shadow-xl"
+                        disabled={!hasAudio}
+                        className={`w-16 h-16 rounded-3xl flex items-center justify-center text-2xl transition-all shadow-xl ${hasAudio
+                                ? "bg-white text-black hover:scale-105 active:scale-95 cursor-pointer"
+                                : "bg-white/10 text-white/40 cursor-not-allowed border border-white/5"
+                            }`}
                     >
-                        {isPlaying ? <HiOutlinePause /> : <HiOutlinePlay className="ml-1" />}
+                        {!hasAudio ? <HiVolumeOff /> : (isPlaying ? <HiOutlinePause /> : <HiOutlinePlay className="ml-1" />)}
                     </button>
 
                     <button
@@ -171,7 +176,7 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                     </div>
                 </div>
 
-                {previewSrc && (
+                {hasAudio && (
                     <audio ref={audioRef} src={previewSrc} onEnded={() => setIsPlaying(false)} className="hidden" />
                 )}
             </div>
