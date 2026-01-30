@@ -57,26 +57,38 @@ export async function GET(req) {
 
         console.log(`Recommendations API: Found ${tracks.length} valid tracks`);
 
-        // 3. Sync to DB for caching/trending logic (Background-ish)
+        // 3. Sync to DB for caching/trending logic (RESILIENT: Continue even if this fails)
         if (tracks.length > 0) {
+            console.log("Recommendations API: Syncing tracks to DB...");
             try {
-                const { error } = await supabaseAdmin
+                const { error: dbError } = await supabaseAdmin
                     .from('tracks')
                     .upsert(tracks, { onConflict: 'spotifyId' });
-                if (error) console.error("Recommendations API: DB Sync Error:", error.message);
+
+                if (dbError) {
+                    console.error("Recommendations API: DB Sync failed (ignoring):", dbError.message);
+                } else {
+                    console.log("Recommendations API: DB Sync successful");
+                }
             } catch (dbErr) {
-                console.error("Recommendations API: DB Critical Error:", dbErr.message);
+                console.error("Recommendations API: DB Critical Sync failure (ignoring):", dbErr.message);
             }
         }
 
+        console.log("Recommendations API: Returning successful response");
         return NextResponse.json(tracks);
 
     } catch (err) {
-        console.error('Recommendations API: Critical Failure:', err);
+        console.error('Recommendations API: CRITICAL FAILURE:', err);
         return NextResponse.json({
             error: 'Failed to fetch recommendations',
             details: err.message,
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+            stack: err.stack,
+            debug_info: {
+                has_spotify_secret: !!process.env.SPOTIFY_CLIENT_SECRET,
+                has_supabase_admin: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+                env: process.env.NODE_ENV
+            }
         }, { status: 500 });
     }
 }

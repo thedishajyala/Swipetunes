@@ -72,6 +72,9 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                         alt={track.name}
                         className={`w-full h-full object-cover transition-transform duration-[2000ms] ease-out ${isPlaying ? "scale-110" : "scale-100"}`}
                         draggable="false"
+                        onError={(e) => {
+                            e.target.src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop";
+                        }}
                     />
                 ) : (
                     <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
