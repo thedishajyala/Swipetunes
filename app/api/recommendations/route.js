@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import SpotifyWebApi from 'spotify-web-api-node';
-import { supabaseAdmin } from '../../../lib/supabase-admin';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req) {
+    console.log("Recommendations API: Initiating fetch...");
     try {
         const session = await getServerSession(authOptions);
         if (!session || !session.accessToken) {
+            console.warn("Recommendations API: Unauthorized - No session or accessToken");
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -18,42 +20,63 @@ export async function GET(req) {
         spotifyApi.setAccessToken(session.accessToken);
 
         // 1. Fetch user's top tracks to use as seeds
-        const topTracksData = await spotifyApi.getMyTopTracks({ limit: 5 });
-        const seedTracks = topTracksData.body.items.map(t => t.id);
+        console.log("Recommendations API: Fetching top tracks...");
+        let seedTracks = [];
+        try {
+            const topTracksData = await spotifyApi.getMyTopTracks({ limit: 5 });
+            seedTracks = topTracksData.body.items.map(t => t.id);
+        } catch (err) {
+            console.error("Recommendations API: Failed to fetch top tracks", err.message);
+        }
 
         if (seedTracks.length === 0) {
-            // Fallback to general pop if user has no top tracks
+            console.log("Recommendations API: No seed tracks found, using default fallback");
             seedTracks.push('4iJyoBOLtHqaGxP12qzhQI'); // Peaches as fallback
         }
 
         // 2. Get recommendations based on seeds
+        console.log(`Recommendations API: Requesting Spotify recommendations for seeds: ${seedTracks.join(',')}`);
         const recsData = await spotifyApi.getRecommendations({
-            min_energy: 0.4,
             seed_tracks: seedTracks.slice(0, 5),
-            limit: 20
+            limit: 30 // Fetch more to allow filtering
         });
 
-        const tracks = recsData.body.tracks.map(track => {
-            return {
-                spotifyId: track.id,
-                name: track.name,
-                artist: track.artists.map(a => a.name).join(', '),
-                coverImage: track.album.images.length > 0 ? track.album.images[0].url : null,
-                previewUrl: track.preview_url,
-                popularity: track.popularity,
-                genre: 'Recommended'
-            };
-        });
+        const tracks = recsData.body.tracks
+            .filter(track => track.preview_url && track.album.images.length > 0) // FILTER: Must have preview and image
+            .map(track => {
+                return {
+                    spotifyId: track.id,
+                    name: track.name,
+                    artist: track.artists.map(a => a.name).join(', '),
+                    coverImage: track.album.images[0].url,
+                    previewUrl: track.preview_url,
+                    popularity: track.popularity,
+                    genre: 'Recommended'
+                };
+            }).slice(0, 20);
 
-        // 3. Sync to DB for caching/trending logic
-        await supabaseAdmin
-            .from('tracks')
-            .upsert(tracks, { onConflict: 'spotifyId', ignoreDuplicates: false });
+        console.log(`Recommendations API: Found ${tracks.length} valid tracks`);
+
+        // 3. Sync to DB for caching/trending logic (Background-ish)
+        if (tracks.length > 0) {
+            try {
+                const { error } = await supabaseAdmin
+                    .from('tracks')
+                    .upsert(tracks, { onConflict: 'spotifyId' });
+                if (error) console.error("Recommendations API: DB Sync Error:", error.message);
+            } catch (dbErr) {
+                console.error("Recommendations API: DB Critical Error:", dbErr.message);
+            }
+        }
 
         return NextResponse.json(tracks);
 
     } catch (err) {
-        console.error('Recommendation Error:', err);
-        return NextResponse.json({ error: 'Failed' }, { status: 500 });
+        console.error('Recommendations API: Critical Failure:', err);
+        return NextResponse.json({
+            error: 'Failed to fetch recommendations',
+            details: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        }, { status: 500 });
     }
 }

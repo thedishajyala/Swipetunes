@@ -17,34 +17,53 @@ export default function Home() {
   const [stats, setStats] = useState({ swipes: 0 });
 
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (session?.user) {
+    if (session?.user && session.accessToken) {
+      console.log("Home: Session ready, fetching data for user:", session.user.id);
       fetchStats(session.user.id);
       fetchTracks();
     }
-    if (status !== "loading") setLoading(false);
-  }, [session, status]);
+  }, [session]);
 
   const fetchStats = async (userId) => {
-    const { count } = await supabase
-      .from('swipes')
-      .select('*', { count: 'exact', head: true })
-      .eq('liked', true)
-      .eq('user_id', userId);
-    setStats({ swipes: count || 0 });
+    try {
+      const { count, error: statsError } = await supabase
+        .from('swipes')
+        .select('*', { count: 'exact', head: true })
+        .eq('liked', true)
+        .eq('user_id', userId);
+
+      if (statsError) {
+        console.error("Home: Fetch Stats Error:", statsError);
+        // Don't set global error yet, just log it
+      } else {
+        setStats({ swipes: count || 0 });
+      }
+    } catch (e) {
+      console.error("Home: Stats Critical Failure:", e);
+    }
   };
 
   async function fetchTracks(isMore = false) {
     if (isMore) setLoadingMore(true);
+    setError(null);
     try {
+      console.log("Home: Requesting recommendations...");
       const response = await fetch('/api/recommendations');
       const data = await response.json();
-      if (Array.isArray(data)) {
+
+      if (response.ok && Array.isArray(data)) {
         setTracks(prev => isMore ? [...prev, ...data] : data);
+        console.log(`Home: Successfully loaded ${data.length} tracks`);
+      } else {
+        setError(data.error || "Failed to load curation");
+        console.error("Home: Recommendation API Error:", data);
       }
     } catch (err) {
-      console.error("Failed to fetch tracks", err);
+      console.error("Home: Failed to fetch tracks", err);
+      setError("Network error curating tracks");
     }
     setLoadingMore(false);
   }
@@ -143,8 +162,22 @@ export default function Home() {
 
   if (!tracks.length) return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
-      <div className="w-12 h-12 border-4 border-[#1DB954] border-t-transparent rounded-full animate-spin"></div>
-      <p className="mt-6 text-gray-500 font-bold uppercase tracking-tighter">Manifesting Tracks...</p>
+      {error ? (
+        <div className="max-w-md p-8 bg-red-500/10 border border-red-500/20 rounded-3xl text-center">
+          <p className="text-red-400 font-bold mb-4">Error: {error}</p>
+          <button
+            onClick={() => fetchTracks()}
+            className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors font-bold"
+          >
+            Retry Discovery
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="w-12 h-12 border-4 border-[#1DB954] border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-6 text-gray-500 font-bold uppercase tracking-tighter">Manifesting Tracks...</p>
+        </>
+      )}
     </div>
   );
 

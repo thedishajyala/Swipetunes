@@ -3,9 +3,8 @@ import { supabase } from "@/lib/supabase";
 export default function UserProfile({ session, stats }) {
     if (!session?.user) return null;
 
-    const { user_metadata } = session.user;
-    const avatar = user_metadata.avatar_url || user_metadata.picture;
-    const name = user_metadata.full_name || user_metadata.name || "Music Lover";
+    const avatar = session.user.image;
+    const name = session.user.name || "Music Lover";
 
     return (
         <div className="w-full max-w-md mb-6 flex items-center justify-between bg-white/10 backdrop-blur-md p-4 rounded-full border border-white/5 transition-all hover:bg-white/15">

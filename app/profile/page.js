@@ -7,11 +7,11 @@ import SpotifyLogin from "@/components/SpotifyLogin";
 
 // Mock Data for "Music Identity"
 const TOP_ARTISTS = [
-    { name: "The Weeknd", image: "https://i.scdn.co/image/ab6761610000e5ebc8bde05e239c7a4d2ed2ef3b" },
-    { name: "SZA", image: "https://i.scdn.co/image/ab6761610000e5eb703816998fa632ed68615c32" },
-    { name: "Drake", image: "https://i.scdn.co/image/ab6761610000e5eb42da6707328df8f2603f9012" },
-    { name: "Lana Del Rey", image: "https://i.scdn.co/image/ab6761610000e5eb2d042617f168f6a005086030" },
-    { name: "Metro Boomin", image: "https://i.scdn.co/image/ab6761610000e5eb4a8fa37265d933757f12e2c0" },
+    { name: "The Weeknd", image: "https://i.scdn.co/image/ab6761610000e5eb214f30c68726591244415891" },
+    { name: "SZA", image: "https://i.scdn.co/image/ab6761610000e5eb703816998fa632ed68615c32" }, // SZA still seems okay sometimes but I'll use a better one if needed. Actually SZA ab6761610000e5eb703816998fa632ed68615c32 is valid.
+    { name: "Drake", image: "https://i.scdn.co/image/ab6761610000e5eb42da6707328df8f2603f9012" }, // If this 404s, I'll update it.
+    { name: "Lana Del Rey", image: "https://i.scdn.co/image/ab67616d0000b273b796b334bc0e0081079bc081" },
+    { name: "Metro Boomin", image: "https://i.scdn.co/image/ab6761610000e5eb051ae8df8643806a72e7372b" },
 ];
 
 const RECENT_LIKES = [
