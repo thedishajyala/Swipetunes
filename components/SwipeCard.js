@@ -142,8 +142,8 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                         onPointerDown={(e) => e.stopPropagation()}
                         disabled={!hasAudio}
                         className={`w-16 h-16 rounded-3xl flex items-center justify-center text-2xl transition-all shadow-xl ${hasAudio
-                                ? "bg-white text-black hover:scale-105 active:scale-95 cursor-pointer"
-                                : "bg-white/10 text-white/40 cursor-not-allowed border border-white/5"
+                            ? "bg-white text-black hover:scale-105 active:scale-95 cursor-pointer"
+                            : "bg-white/10 text-white/40 cursor-not-allowed border border-white/5"
                             }`}
                     >
                         {!hasAudio ? <HiVolumeOff /> : (isPlaying ? <HiOutlinePause /> : <HiOutlinePlay className="ml-1" />)}
@@ -174,6 +174,19 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                             />
                         ))}
                     </div>
+                </div>
+
+                <div className="flex justify-center mt-4">
+                    <a
+                        href={`https://open.spotify.com/track/${track.id || track.track_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs font-bold uppercase tracking-widest text-[#1DB954] hover:text-white transition-colors flex items-center gap-2"
+                    >
+                        <span>▶ Play Full Song on Spotify</span>
+                    </a>
                 </div>
 
                 {hasAudio && (

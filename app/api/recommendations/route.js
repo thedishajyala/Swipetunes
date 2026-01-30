@@ -59,28 +59,15 @@ export async function GET(req) {
             console.error("Recs API: Spotify Recommendations failed:", spotifyErr.message);
         }
 
-        // 5. COMBINE ALL SOURCES
+        // 5. COMBINE ALL SOURCES (To find seeds/candidates)
         const mixedRawTracks = [...topTracks, ...recentTracks, ...savedTracks, ...recs];
 
-        // 5. COMBINE: My Top Songs + New Discoveries
-        // The user wants to see their top songs too!
-
-        // 6. Filter: Require Preview URL for Recommendations, but ALLOW User's Own Tracks without it (visual only)
+        // 6. Strict Filtering: MUST Have Preview URL (Pure Discovery Mode)
         // We Deduplicate by ID
         const seenIds = new Set();
         let validTracks = mixedRawTracks
             .filter(track => {
-                if (!track) return false;
-
-                // Check if this track is from the user's history/library
-                const isUserTrack =
-                    topTracks.some(t => t.id === track.id) ||
-                    recentTracks.some(t => t.id === track.id) ||
-                    savedTracks.some(t => t.id === track.id);
-
-                // If it's a new recommendation, it MUST have audio.
-                // If it's the user's own track, we allow it even without audio (Visual Mode).
-                if (!isUserTrack && !track.preview_url) return false;
+                if (!track || !track.preview_url) return false;
 
                 if (seenIds.has(track.id)) return false;
                 seenIds.add(track.id);
