@@ -14,7 +14,7 @@ export default function History() {
                 // --- UUID RESOLVER ---
                 const lookupId = session.user.id; // Usually spotify_id in history
                 const { data: profile } = await supabase
-                    .from('profiles')
+                    .from('users')
                     .select('id')
                     .eq('spotify_id', lookupId)
                     .maybeSingle();
@@ -34,7 +34,7 @@ export default function History() {
                     const trackIds = swipes.map(s => s.track_id);
                     // Use 'in' filter. Note: if trackIds is huge, this might break. For demo it's fine.
                     const { data: tracksData, error: tracksError } = await supabase
-                        .from('tracks')
+                        .from('songs')
                         .select('*')
                         .in('id', trackIds);
 

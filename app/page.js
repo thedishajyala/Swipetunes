@@ -48,14 +48,12 @@ export default function Home() {
   const fetchStats = async (userId) => {
     try {
       const { count, error: statsError } = await supabase
-        .from('swipes')
+        .from('likes')
         .select('*', { count: 'exact', head: true })
-        .eq('liked', true)
         .eq('user_id', userId);
 
       if (statsError) {
         console.error("Home: Fetch Stats Error:", statsError);
-        // Don't set global error yet, just log it
       } else {
         setStats({ swipes: count || 0 });
       }
@@ -100,53 +98,29 @@ export default function Home() {
     if ((userId || session?.user?.id) && track) {
       const targetId = userId || session.user.id;
 
-      // 1. Record the swipe
-      await supabase.from('swipes').insert({
-        user_id: targetId,
-        track_id: track.id,
-        liked: liked
-      });
-
-      // 2. If liked, upsert to 'songs' table for social feed
       if (liked) {
         setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
 
         try {
-          // Fetch existing song to update liked_by array
-          const { data: existingSong } = await supabase
-            .from('songs')
-            .select('liked_by')
-            .eq('track_id', track.id)
-            .maybeSingle();
+          // 1. Record the Like
+          await supabase.from('likes').upsert({
+            user_id: targetId,
+            track_id: track.id
+          });
 
-          const currentLikers = existingSong?.liked_by || [];
-          if (!currentLikers.includes(targetId)) {
-            const newLikers = [...currentLikers, targetId];
+          // 2. Reward XP for liking a song
+          fetch('/api/gamification', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'swipe_like' })
+          });
 
-            await supabase.from('songs').upsert({
-              track_id: track.id,
-              title: track.name,
-              artist: track.artists[0]?.name,
-              album: track.album?.name,
-              cover_url: track.album?.images[0]?.url,
-              liked_by: newLikers,
-              created_at: new Date().toISOString()
-            });
-
-            // Reward XP for liking a song
-            fetch('/api/gamification', {
-              method: 'POST',
-              body: JSON.stringify({ action: 'swipe_like' })
-            });
-
-            // Add to Music Journal
-            fetch('/api/journal', {
-              method: 'POST',
-              body: JSON.stringify({ track_id: track.id, action: 'liked' })
-            });
-          }
+          // 3. Add to Music Journal
+          fetch('/api/journal', {
+            method: 'POST',
+            body: JSON.stringify({ track_id: track.id, action: 'liked' })
+          });
         } catch (e) {
-          console.error("Home: Failed to sync social song:", e);
+          console.error("Home: Failed to sync social signal:", e);
         }
       }
     }

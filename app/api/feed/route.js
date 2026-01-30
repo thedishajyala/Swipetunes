@@ -67,7 +67,7 @@ export async function GET(request) {
         // 5. Fetch User Status Posts from friends and self
         const allRelevantUserIds = [...new Set([...friendIds, userId])];
         const { data: userPosts, error: userPostsError } = await supabaseAdmin
-            .from('user_posts')
+            .from('posts')
             .select(`
                 *,
                 users(display_name, profile_pic_url)
