@@ -64,7 +64,6 @@ export async function GET(req) {
 
         // 5. COMBINE: My Top Songs + New Discoveries
         // The user wants to see their top songs too!
-        const mixedRawTracks = [...topTracks, ...recs];
 
         // 6. Filter: Require Preview URL for Recommendations, but ALLOW Top Tracks without it (visual only)
         // We Deduplicate by ID
