@@ -1,7 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { Toaster } from "react-hot-toast";
-import NextAuthProvider from "@/components/NextAuthProvider";
 import { Providers } from "./providers";
 import Sidebar from "@/components/Sidebar";
 import "./globals.css";
@@ -26,7 +25,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#050505] text-white selection:bg-[#1DB954] selection:text-black`}>
         <Toaster position="bottom-right" toastOptions={{ style: { background: '#111', color: '#fff', border: '1px solid #333' } }} />
-        <NextAuthProvider>
+        <Providers>
           <div className="flex min-h-screen relative overflow-hidden">
             <div className="fixed inset-0 opacity-[0.15] pointer-events-none z-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
             <Sidebar />
@@ -36,7 +35,7 @@ export default function RootLayout({ children }) {
               </div>
             </main>
           </div>
-        </NextAuthProvider>
+        </Providers>
       </body>
     </html>
   );

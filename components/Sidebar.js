@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -16,6 +18,7 @@ import { HiOutlineMusicNote, HiOutlineUserCircle, HiOutlineLightningBolt, HiOutl
 
 export default function Sidebar() {
     const { data: session } = useSession();
+    const pathname = usePathname();
     const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {

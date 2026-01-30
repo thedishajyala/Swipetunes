@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/next';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
