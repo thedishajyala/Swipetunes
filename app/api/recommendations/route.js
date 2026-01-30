@@ -3,7 +3,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getTopTracks, getTopArtists, getRecommendations, getRecentlyPlayed, getMySavedTracks } from "@/lib/spotify";
-import { FALLBACK_CATALOG } from "@/lib/fallback-catalog";
 
 export async function GET(req) {
     try {
@@ -126,6 +125,6 @@ export async function GET(req) {
         return NextResponse.json(validTracks);
     } catch (err) {
         console.error('Recs API Critical Failure:', err);
-        return NextResponse.json(FALLBACK_CATALOG);
+        return NextResponse.json({ error: "Server Error", details: err.message }, { status: 500 });
     }
 }
