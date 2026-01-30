@@ -16,6 +16,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ swipes: 0 });
 
+  const [loadingMore, setLoadingMore] = useState(false);
+
   useEffect(() => {
     if (session?.user) {
       fetchStats(session.user.id);
@@ -33,13 +35,28 @@ export default function Home() {
     setStats({ swipes: count || 0 });
   };
 
-  async function fetchTracks() {
-    const { data, error } = await supabase.from('tracks').select('*').limit(20);
-    if (data) setTracks(data);
+  async function fetchTracks(isMore = false) {
+    if (isMore) setLoadingMore(true);
+    try {
+      const response = await fetch('/api/recommendations');
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setTracks(prev => isMore ? [...prev, ...data] : data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch tracks", err);
+    }
+    setLoadingMore(false);
   }
 
   const handleSwipe = async (liked) => {
     const track = tracks[currentIndex];
+
+    // Check if we need more tracks
+    if (currentIndex >= tracks.length - 5 && !loadingMore) {
+      fetchTracks(true);
+    }
+
     setSwipeDirection(null);
     setCurrentIndex((prev) => prev + 1);
 

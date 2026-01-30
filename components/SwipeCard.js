@@ -33,8 +33,21 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
+
+            // Autoplay logic for "Reels" feel
+            if (previewSrc) {
+                const playTimeout = setTimeout(() => {
+                    audioRef.current.play().then(() => {
+                        setIsPlaying(true);
+                    }).catch(err => {
+                        console.log("Autoplay blocked or failed:", err);
+                        setIsPlaying(false);
+                    });
+                }, 500); // Slight delay for smooth transition
+                return () => clearTimeout(playTimeout);
+            }
         }
-    }, [track]);
+    }, [track, previewSrc]);
 
     return (
         <motion.div

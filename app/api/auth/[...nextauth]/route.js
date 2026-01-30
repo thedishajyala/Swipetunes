@@ -15,7 +15,7 @@ const scopes = [
     "user-top-read"
 ].join(",");
 
-const handler = NextAuth({
+export const authOptions = {
     providers: [
         SpotifyProvider({
             clientId: process.env.SPOTIFY_CLIENT_ID,
@@ -27,7 +27,6 @@ const handler = NextAuth({
     ],
     callbacks: {
         async jwt({ token, account, user }) {
-            // Initial sign on
             if (account && user) {
                 return {
                     ...token,
@@ -44,11 +43,10 @@ const handler = NextAuth({
             session.accessToken = token.accessToken;
             session.error = token.error;
 
-            // Sync user to Supabase if needed (basic upsert)
             try {
                 if (session.user?.email) {
                     await supabaseAdmin.from('profiles').upsert({
-                        id: token.sub || session.user.id, // Ensure we have an id
+                        id: token.sub || session.user.id,
                         email: session.user.email,
                         name: session.user.name,
                         avatar: session.user.image,
@@ -63,6 +61,8 @@ const handler = NextAuth({
         },
     },
     secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
