@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { Toaster } from "react-hot-toast";
-import { Providers } from "./providers";
+import { Providers } from "@/app/providers";
 import Sidebar from "@/components/Sidebar";
 import "./globals.css";
 
