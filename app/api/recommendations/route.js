@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { getTopTracks, getRecommendations } from "@/lib/spotify";
+import { getTopTracks, getTopArtists, getRecommendations } from "@/lib/spotify";
 import { FALLBACK_CATALOG } from "@/lib/fallback-catalog";
 
 export async function GET(req) {
@@ -12,29 +12,71 @@ export async function GET(req) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // 1. Fetch seeds (Limit 50)
-        let seedTrackIds = [];
+        // 1. Fetch Top Tracks (User Favorites) - Limit 50
+        let topTracks = [];
         try {
             const topTracksData = await getTopTracks(session.accessToken, 'short_term', 50);
-            seedTrackIds = topTracksData.items?.map(t => t.id) || [];
+            topTracks = topTracksData.items || [];
         } catch (err) {
-            console.warn("Recs API: Spotify fetch failed (Top Tracks).");
+            console.warn("Recs API: Spotify Top Tracks fetch failed.", err);
         }
 
-        // 2. Get recommendations (Limit 100 for maximum yield)
+        // 2. Fetch Top Artists (Backup Seeds) - Limit 5
+        let topArtists = [];
+        try {
+            const topArtistsData = await getTopArtists(session.accessToken, 'short_term', 5);
+            topArtists = topArtistsData.items || [];
+        } catch (err) {
+            console.warn("Recs API: Spotify Top Artists fetch failed.", err);
+        }
+
+        // 3. Prepare Seeds
+        let seedTrackIds = topTracks.map(t => t.id).slice(0, 3);
+        let seedArtistIds = topArtists.map(a => a.id).slice(0, 2);
+
+        // Fallback seeds if user has no history
+        if (seedTrackIds.length === 0 && seedArtistIds.length === 0) {
+            // Use 'The Weeknd' (artist) and 'Blinding Lights' (track) as generic global seeds
+            seedArtistIds = ['1Xyo4u8uXC1ZmMpatF05PJ'];
+            seedTrackIds = ['0VjIjW4GlUZAMYd2vXMi3b'];
+        }
+
+        // 4. Get New Recommendations
         let recs = [];
         try {
-            const seeds = seedTrackIds.length > 0 ? seedTrackIds.slice(0, 5) : ['4iJyoBOLtHqaGxP12qzhQI'];
-            // Request 100 to increase odds of finding preview_urls
-            recs = await getRecommendations(session.accessToken, seeds, { limit: 100 });
+            // Smart mixing of seeds: prioritize tracks, but use artist if needed
+            const seeds = [...seedTrackIds, ...seedArtistIds].slice(0, 5); // Max 5 seeds allowed
+
+            // We strictly need VALID seeds. 
+            // If we mix types, we need to be careful. The library function uses `seed_tracks` hardcoded?
+            // Checking library... yes, it uses `seed_tracks: seedTracks.join(',')`. 
+            // FIX: We must pass strictly TRACK IDs if the lib function is hardcoded for tracks.
+            // Actually, the lib function logic: `const params = new URLSearchParams({ seed_tracks: seedTracks.join(','), ...options });`
+            // So if we pass artist IDs as 'seed_tracks', it will fail.
+            // We should just use TRACK IDs from top tracks. If we have 0 top tracks, we use fallback track seeds.
+
+            const validTrackSeeds = topTracks.map(t => t.id).slice(0, 5);
+            const finalSeeds = validTrackSeeds.length > 0 ? validTrackSeeds : ['0VjIjW4GlUZAMYd2vXMi3b'];
+
+            recs = await getRecommendations(session.accessToken, finalSeeds, { limit: 50 });
         } catch (spotifyErr) {
             console.error("Recs API: Spotify Recommendations failed:", spotifyErr.message);
-            // On error, we rely on fallbacks
         }
 
-        // 3. Strict Filtering: MUST Have Preview URL
-        let tracks = (recs || [])
-            .filter(track => track && track.preview_url)
+        // 5. COMBINE: My Top Songs + New Discoveries
+        // The user wants to see their top songs too!
+        const mixedRawTracks = [...topTracks, ...recs];
+
+        // 6. Strict Filtering: MUST Have Preview URL
+        // We Deduplicate by ID
+        const seenIds = new Set();
+        let validTracks = mixedRawTracks
+            .filter(track => {
+                if (!track || !track.preview_url) return false;
+                if (seenIds.has(track.id)) return false;
+                seenIds.add(track.id);
+                return true;
+            })
             .map(track => ({
                 track_id: track.id,
                 title: track.name || "Unknown Track",
@@ -45,25 +87,20 @@ export async function GET(req) {
                 color: '#1DB954'
             }));
 
-        // 4. HYBRID FILLER: If tracks < 10, fill with Curated Catalog
-        // Identify which fallbacks are not already in tacks
-        if (tracks.length < 10) {
-            const currentIds = new Set(tracks.map(t => t.track_id));
-            const needed = 10 - tracks.length;
-
+        // 7. HYBRID FILLER: If tracks < 10, fill with Curated Catalog
+        if (validTracks.length < 10) {
+            const currentIds = new Set(validTracks.map(t => t.track_id));
             const fillers = FALLBACK_CATALOG.filter(kt => !currentIds.has(kt.track_id));
-
-            // Randomly shuffle fillers to vary experience if possible, but simplest is just concat
-            tracks = [...tracks, ...fillers];
+            validTracks = [...validTracks, ...fillers];
         }
 
-        // 5. Update catalog safely
-        if (tracks.length > 0 && supabaseAdmin) {
+        // 8. Update catalog safely
+        if (validTracks.length > 0 && supabaseAdmin) {
             try {
                 await supabaseAdmin
                     .from('songs')
                     .upsert(
-                        tracks.map(t => ({
+                        validTracks.map(t => ({
                             track_id: t.track_id,
                             title: t.title,
                             artist: t.artist,
@@ -73,24 +110,13 @@ export async function GET(req) {
                         { onConflict: 'track_id' }
                     );
             } catch (catalogErr) {
-                // Silent fail for catalog sync
+                // Silent fail
             }
         }
 
-        // 6. Deduplicate just in case
-        const seen = new Set();
-        const uniqueTracks = [];
-        for (const t of tracks) {
-            if (!seen.has(t.track_id)) {
-                seen.add(t.track_id);
-                uniqueTracks.push(t);
-            }
-        }
-
-        return NextResponse.json(uniqueTracks);
+        return NextResponse.json(validTracks);
     } catch (err) {
         console.error('Recs API Critical Failure:', err);
-        // Absolute fail-safe
         return NextResponse.json(FALLBACK_CATALOG);
     }
 }
