@@ -4,6 +4,25 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getRecommendations } from "@/lib/spotify";
 
+const FALLBACK_TRACKS = [
+    {
+        id: "0VjIjW4GlUZAMYd2vXMi3b",
+        name: "Blinding Lights",
+        artists: [{ name: "The Weeknd" }],
+        album: { name: "After Hours", images: [{ url: "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36" }] },
+        popularity: 90,
+        track_id: "0VjIjW4GlUZAMYd2vXMi3b"
+    },
+    {
+        id: "21jGcNKet2qwijl0efuYtR",
+        name: "Levitating",
+        artists: [{ name: "Dua Lipa" }],
+        album: { name: "Future Nostalgia", images: [{ url: "https://i.scdn.co/image/ab67616d0000b273bd26ede1ae69327010d49946" }] },
+        popularity: 85,
+        track_id: "21jGcNKet2qwijl0efuYtR"
+    }
+];
+
 export async function GET(request) {
     try {
         const session = await getServerSession(authOptions);
@@ -24,7 +43,7 @@ export async function GET(request) {
             ...(recentLikes?.map(l => l.track_id) || [])
         ].filter(Boolean).slice(0, 5);
 
-        // 2. Fetch from Spotify with Mood Overlays 
+        // 2. Fetch from Spotify
         const moodParams = {
             'morning': { target_energy: 0.4, target_valence: 0.6 },
             'workout': { min_tempo: 120, target_energy: 0.8 },
@@ -32,11 +51,17 @@ export async function GET(request) {
             'vibe': { target_popularity: 50 }
         };
 
-        const recs = await getRecommendations(
-            session.accessToken,
-            seedTrackIds.length > 0 ? seedTrackIds : ['4cOdK9sSTH1YyM9G9yYI92'],
-            moodParams[mode] || {}
-        );
+        let recs = [];
+        try {
+            recs = await getRecommendations(
+                session.accessToken,
+                seedTrackIds.length > 0 ? seedTrackIds : ['4cOdK9sSTH1YyM9G9yYI92'],
+                moodParams[mode] || {}
+            );
+        } catch (e) {
+            console.error("AI API Spotify Error:", e.message);
+            return NextResponse.json(FALLBACK_TRACKS);
+        }
 
         const tracks = (recs || []).map(track => {
             if (!track) return null;
@@ -50,9 +75,11 @@ export async function GET(request) {
             };
         }).filter(Boolean);
 
+        if (tracks.length === 0) return NextResponse.json(FALLBACK_TRACKS);
+
         return NextResponse.json(tracks);
     } catch (error) {
         console.error("AI Recommendations Critical Failure:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json(FALLBACK_TRACKS);
     }
 }
