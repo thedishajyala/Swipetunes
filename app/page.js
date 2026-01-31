@@ -73,18 +73,68 @@ export default function Home() {
   async function fetchTracks(isMore = false) {
     if (isMore) setLoadingMore(true);
     setError(null);
-    try {
-      console.log("Home: Requesting recommendations...");
-      const response = await fetch('/api/recommendations');
-      const data = await response.json();
 
-      if (response.ok && Array.isArray(data)) {
-        setTracks(prev => isMore ? [...prev, ...data] : data);
-        console.log(`Home: Successfully loaded ${data.length} tracks`);
+    if (!session?.accessToken) {
+      console.warn("Home: No access token available for fetching tracks.");
+      setLoadingMore(false);
+      return;
+    }
+
+    try {
+      const spotifyToken = session.accessToken;
+      console.log("Home: Fetching Top Artists...");
+
+      // 1. Get Top Artists
+      const topArtistsRes = await fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
+        headers: { Authorization: `Bearer ${spotifyToken}` }
+      });
+      const topArtistsData = await topArtistsRes.json();
+      const topArtists = topArtistsData.items || [];
+
+      if (!topArtists.length) {
+        console.warn("Home: No top artists found.");
+        setError("No top artists found to base recommendations on.");
+        setLoadingMore(false);
+        return;
+      }
+
+      // 2. Call Recommendations
+      const artistIds = topArtists.slice(0, 5).map(a => a.id).join(",");
+      const res = await fetch(
+        `https://api.spotify.com/v1/recommendations?seed_artists=${artistIds}&limit=50`,
+        {
+          headers: {
+            Authorization: `Bearer ${spotifyToken}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      // 3. Filter ONLY playable tracks
+      const playableTracks = (data.tracks || []).filter(t => t.preview_url);
+
+      if (playableTracks.length === 0 && (data.tracks || []).length > 0) {
+        console.warn("Home: Found tracks but none were playable.");
+        // Optional: Fallback logic or just show error/empty
+        // For now, adhering strictly to user request: "Filter ONLY playable tracks"
+      }
+
+      // Map to internal format if needed (SwipeCard expects particular fields)
+      // SwipeCard uses: track.previewUrl || track.preview_url
+      // track.coverImage || track.cover_url || track.album?.images[0]?.url
+      // track.name || track.title
+      // track.artist || track.artists[0]?.name
+
+      console.log(`Home: Found ${playableTracks.length} playable tracks.`);
+
+      if (Array.isArray(playableTracks)) {
+        setTracks(prev => isMore ? [...prev, ...playableTracks] : playableTracks);
       } else {
-        setError(data); // Pass full object including details and debug_info
+        setError(data);
         console.error("Home: Recommendation API Error:", data);
       }
+
     } catch (err) {
       console.error("Home: Failed to fetch tracks", err);
       setError("Network error curating tracks");
@@ -202,7 +252,7 @@ export default function Home() {
 
   const track = tracks[currentIndex];
 
-  if (!tracks.length) return (
+  if (!tracks.length && !loading) return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
       {error ? (
         <div className="max-w-md p-8 bg-red-500/10 border border-red-500/20 rounded-3xl text-center">
@@ -218,13 +268,31 @@ export default function Home() {
           </button>
         </div>
       ) : (
-        <>
-          <div className="w-12 h-12 border-4 border-[#1DB954] border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-6 text-gray-500 font-bold uppercase tracking-tighter">Manifesting Tracks...</p>
-        </>
+        <div className="text-center max-w-md mx-auto">
+          <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-8 mx-auto">
+            <HiOutlineMusicNote className="text-4xl text-gray-400" />
+          </div>
+          <h2 className="text-3xl font-black text-white tracking-tighter mb-4">Silence in the Void</h2>
+          <p className="text-gray-400 font-medium mb-8">We couldn't find any tracks matching your vibe right now.</p>
+          <button
+            onClick={() => fetchTracks()}
+            className="px-8 py-3 bg-[#1DB954] text-black font-black rounded-full hover:scale-105 transition-transform"
+          >
+            Try Again
+          </button>
+        </div>
       )}
     </div>
   );
+
+  if (loading && tracks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh]">
+        <SkeletonCard />
+        <p className="mt-8 text-gray-500 font-bold uppercase tracking-widest animate-pulse">Curating your vibe...</p>
+      </div>
+    );
+  }
 
   if (!track) return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] text-center max-w-md mx-auto">

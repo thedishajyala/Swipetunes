@@ -75,10 +75,36 @@ export async function GET(req) {
 
         // If we don't have enough playable tracks (e.g. < 10), fill up with non-playable recommendations
         // This prevents the "Demo Songs" issue while trying to provide audio key.
-        if (validTracks.length < 10) {
-            const nonPlayable = allUniqueTracks.filter(t => !t.preview_url);
-            const needed = 10 - validTracks.length;
-            validTracks = [...validTracks, ...nonPlayable.slice(0, needed + 20)]; // Add plenty of backups
+        if (validTracks.length < 5) {
+            console.log("Recs API: Insufficient playable tracks found. Attempting generic fallback...");
+            try {
+                // Fallback: Get recommendations based on popular genres to ensure we have content
+                // Seeds: pop, dance, hip-hop, rock, indie
+                const fallbackRecs = await getRecommendations(session.accessToken, [], {
+                    limit: 20,
+                    seed_genres: ['pop', 'dance', 'hip-hop', 'rock', 'indie'],
+                    min_popularity: 50
+                });
+
+                const fallbackValid = fallbackRecs.filter(t => t.preview_url);
+
+                // Add unique new tracks
+                fallbackValid.forEach(t => {
+                    if (!seenIds.has(t.id)) {
+                        seenIds.add(t.id);
+                        validTracks.push(t);
+                    }
+                });
+            } catch (fallbackErr) {
+                console.error("Recs API: Fallback fetch failed:", fallbackErr.message);
+            }
+        }
+
+        // Final safety net: if we STILL have < 5, just relax the preview_url constraint
+        // to show *something* (metadata only) rather than an empty screen.
+        if (validTracks.length < 5) {
+            const remainder = allUniqueTracks.filter(t => !t.preview_url && !seenIds.has(t.id));
+            validTracks = [...validTracks, ...remainder.slice(0, 20)];
         }
 
         // Format for Frontend
