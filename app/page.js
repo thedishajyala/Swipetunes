@@ -157,6 +157,18 @@ export default function Home() {
         setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
 
         try {
+          // 0. Persist Track Data (Critical for History/Feeds)
+          const { error: songError } = await supabase.from('songs').upsert({
+            track_id: track.id,
+            title: track.name,
+            artist: track.artists ? track.artists[0].name : track.artist,
+            album: track.album ? track.album.name : "Single",
+            cover_url: (track.album && track.album.images && track.album.images[0]) ? track.album.images[0].url : track.coverImage,
+            preview_url: track.preview_url
+          }, { onConflict: 'track_id' });
+
+          if (songError) console.error("Home: Failed to persist song data:", songError);
+
           // 1. Record the Like
           await supabase.from('likes').upsert({
             user_id: targetId,

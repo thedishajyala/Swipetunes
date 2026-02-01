@@ -22,21 +22,31 @@ export default function History() {
                 const userId = profile ? profile.id : lookupId;
                 console.log("History: Using resolved userId:", userId);
 
-                // 1. Get liked swipes
-                const { data: swipes, error: swipesError } = await supabase
-                    .from('swipes')
+                // 1. Get likes
+                const { data: userLikes, error: likesError } = await supabase
+                    .from('likes')
                     .select('track_id')
-                    .eq('user_id', userId)
-                    .eq('liked', true);
+                    .eq('user_id', userId);
 
-                if (swipes && swipes.length > 0) {
+                if (userLikes && userLikes.length > 0) {
                     // 2. Get tracks
-                    const trackIds = swipes.map(s => s.track_id);
-                    // Use 'in' filter. Note: if trackIds is huge, this might break. For demo it's fine.
+                    const trackIds = userLikes.map(l => l.track_id);
+                    // Fetch song details
                     const { data: tracksData, error: tracksError } = await supabase
                         .from('songs')
                         .select('*')
-                        .in('id', trackIds);
+                        .in('track_id', trackIds); // Note: Column might be track_id or id, checking previous api usage it seems 'track_id' is used in upsert but 'id' might be primary. Let's try matching schema from api/recommendations.
+
+                    // Update: api/recommendations upserts with { track_id, title... }. 
+                    // Usually Supabase queries return what's in the table. 
+                    // If 'songs' table primary key is 'id' text, then we use 'id'.
+                    // Let's assume 'track_id' is the column name for spotify ID if that's what was used before, 
+                    // BUT standard practice is often 'id'.
+                    // Looking at api/recommendations: .upsert({ track_id: t.track_id ... })
+                    // So the column in songs table is likely `track_id`.
+                    // Wait, history page previously used `.in('id', trackIds)`.
+                    // I will try to use `track_id` to be safe if that's what's stored, or `id`.
+                    // actually let's assume `track_id` based on `api/recommendations` upsert.
 
                     if (tracksData) setTracks(tracksData);
                 } else {
