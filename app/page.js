@@ -82,62 +82,97 @@ export default function Home() {
 
     try {
       const spotifyToken = session.accessToken;
-      console.log("Home: Fetching Top Artists...");
+      let seedArtists = [];
+      let seedGenres = [];
 
-      // 1. Get Top Artists
-      const topArtistsRes = await fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
+      // --- STRATEGY 1: Top Artists ---
+      console.log("Home: Attempting to fetch Top Artists...");
+      try {
+        const topArtistsRes = await fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
+          headers: { Authorization: `Bearer ${spotifyToken}` }
+        });
+        if (topArtistsRes.ok) {
+          const topArtistsData = await topArtistsRes.json();
+          seedArtists = (topArtistsData.items || []).map(a => a.id).slice(0, 5);
+        }
+      } catch (e) { console.warn("Home: Top Artists fetch failed", e); }
+
+      // --- STRATEGY 2: Top Tracks (Fallback) ---
+      if (seedArtists.length === 0) {
+        console.log("Home: Top Artists empty, trying Top Tracks...");
+        try {
+          const topTracksRes = await fetch('https://api.spotify.com/v1/me/top/tracks?limit=10', {
+            headers: { Authorization: `Bearer ${spotifyToken}` }
+          });
+          if (topTracksRes.ok) {
+            const topTracksData = await topTracksRes.json();
+            const artists = new Set();
+            (topTracksData.items || []).forEach(t => {
+              (t.artists || []).forEach(a => artists.add(a.id));
+            });
+            seedArtists = Array.from(artists).slice(0, 5);
+          }
+        } catch (e) { console.warn("Home: Top Tracks fetch failed", e); }
+      }
+
+      // --- STRATEGY 3: Recently Played (Fallback) ---
+      if (seedArtists.length === 0) {
+        console.log("Home: Top Tracks empty, trying Recently Played...");
+        try {
+          const recentRes = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=20', {
+            headers: { Authorization: `Bearer ${spotifyToken}` }
+          });
+          if (recentRes.ok) {
+            const recentData = await recentRes.json();
+            const artists = new Set();
+            (recentData.items || []).forEach(item => {
+              (item.track.artists || []).forEach(a => artists.add(a.id));
+            });
+            seedArtists = Array.from(artists).slice(0, 5);
+          }
+        } catch (e) { console.warn("Home: Recently Played fetch failed", e); }
+      }
+
+      // --- STRATEGY 4: Default Genres (Last Resort) ---
+      if (seedArtists.length === 0) {
+        console.log("Home: No history found, using Default Genres...");
+        seedGenres = ['pop', 'dance', 'hip-hop', 'indie', 'house'];
+      }
+
+      // --- EXECUTE RECOMMENDATIONS ---
+      let queryParams = `limit=50`;
+      if (seedArtists.length > 0) {
+        queryParams += `&seed_artists=${seedArtists.join(',')}`;
+      } else {
+        queryParams += `&seed_genres=${seedGenres.join(',')}`;
+      }
+
+      console.log(`Home: Fetching recommendations with params: ${queryParams}`);
+      const recsRes = await fetch(`https://api.spotify.com/v1/recommendations?${queryParams}`, {
         headers: { Authorization: `Bearer ${spotifyToken}` }
       });
-      const topArtistsData = await topArtistsRes.json();
-      const topArtists = topArtistsData.items || [];
 
-      if (!topArtists.length) {
-        console.warn("Home: No top artists found.");
-        setError("No top artists found to base recommendations on.");
-        setLoadingMore(false);
-        return;
+      if (!recsRes.ok) {
+        throw new Error("Recommendations API request failed");
       }
 
-      // 2. Call Recommendations
-      const artistIds = topArtists.slice(0, 5).map(a => a.id).join(",");
-      const res = await fetch(
-        `https://api.spotify.com/v1/recommendations?seed_artists=${artistIds}&limit=50`,
-        {
-          headers: {
-            Authorization: `Bearer ${spotifyToken}`,
-          },
-        }
-      );
+      const data = await recsRes.json();
 
-      const data = await res.json();
-
-      // 3. Filter ONLY playable tracks
+      // Filter ONLY playable tracks
       const playableTracks = (data.tracks || []).filter(t => t.preview_url);
-
-      if (playableTracks.length === 0 && (data.tracks || []).length > 0) {
-        console.warn("Home: Found tracks but none were playable.");
-        // Optional: Fallback logic or just show error/empty
-        // For now, adhering strictly to user request: "Filter ONLY playable tracks"
-      }
-
-      // Map to internal format if needed (SwipeCard expects particular fields)
-      // SwipeCard uses: track.previewUrl || track.preview_url
-      // track.coverImage || track.cover_url || track.album?.images[0]?.url
-      // track.name || track.title
-      // track.artist || track.artists[0]?.name
 
       console.log(`Home: Found ${playableTracks.length} playable tracks.`);
 
-      if (Array.isArray(playableTracks)) {
-        setTracks(prev => isMore ? [...prev, ...playableTracks] : playableTracks);
+      if (playableTracks.length === 0) {
+        setError("We found music, but none with playable previews. Try listening to more music on Spotify first!");
       } else {
-        setError(data);
-        console.error("Home: Recommendation API Error:", data);
+        setTracks(prev => isMore ? [...prev, ...playableTracks] : playableTracks);
       }
 
     } catch (err) {
       console.error("Home: Failed to fetch tracks", err);
-      setError("Network error curating tracks");
+      // Fallback UI error
+      setError({ details: "Unable to curate feed. Please try again." });
     }
     setLoadingMore(false);
   }
