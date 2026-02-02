@@ -54,6 +54,8 @@ export default function Sidebar() {
 
     const navItems = [
         { name: "Swipe", path: "/", icon: <HiOutlineMusicNote size={24} /> },
+        { name: "People", path: "/people", icon: <HiOutlineUserGroup size={24} /> },
+        { name: "Trending", path: "/trending", icon: <HiOutlineFire size={24} /> },
         { name: "My Identity", path: "/profile", icon: <HiOutlineUserCircle size={24} /> },
         { name: "History", path: "/history", icon: <HiOutlineClock size={24} /> },
     ];
