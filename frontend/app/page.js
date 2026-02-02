@@ -325,7 +325,7 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
       {error ? (
         <div className="max-w-md p-8 bg-red-500/10 border border-red-500/20 rounded-3xl text-center">
-          <p className="text-red-400 font-bold mb-2">Discovery Failed</p>
+          <p className="text-red-400 font-bold mb-2">Couldn’t fetch tracks. Retry.</p>
           <p className="text-red-300/60 text-xs mb-6 font-medium leading-relaxed">
             {typeof error === 'string' ? error : (error.details || "The cosmic signal is weak. Try again in a moment.")}
           </p>
@@ -372,12 +372,7 @@ export default function Home() {
       <p className="text-gray-400 font-medium mb-10">You've explored everything we have for now. Check back soon for fresh rotations.</p>
 
       <div className="flex gap-4">
-        <button
-          onClick={() => window.location.href = "/recommendations"}
-          className="px-8 py-4 bg-white text-black font-black rounded-full hover:scale-105 transition-transform"
-        >
-          View Matches
-        </button>
+        {/* Matches removed for focused MVP */}
       </div>
     </div>
   );

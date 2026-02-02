@@ -55,13 +55,6 @@ export default function Sidebar() {
     const navItems = [
         { name: "Swipe", path: "/", icon: <HiOutlineMusicNote size={24} /> },
         { name: "My Identity", path: "/profile", icon: <HiOutlineUserCircle size={24} /> },
-        { name: "Feed", path: "/feed", icon: <HiOutlineFire size={24} /> },
-        { name: "Messages", path: "/chat", icon: <HiOutlineChatAlt2 size={24} /> },
-        { name: "Journal", path: "/journal", icon: <HiOutlineBookOpen size={24} /> },
-        { name: "Trends", path: "/trends", icon: <HiOutlineFire size={24} /> },
-        { name: "Discover", path: "/discover", icon: <HiOutlineUserGroup size={24} /> },
-        { name: "Events", path: "/events", icon: <HiOutlineTicket size={24} /> },
-        { name: "Matches", path: "/recommendations", icon: <HiOutlineLightningBolt size={24} /> },
         { name: "History", path: "/history", icon: <HiOutlineClock size={24} /> },
     ];
 
