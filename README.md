@@ -8,11 +8,28 @@ SwipeTunes is a full-stack music discovery application that lets you explore new
 
 ## 🏗 Architecture
 
-SwipeTunes uses a modern **3-Tier Architecture**:
+**SwipeTunes** uses a robust 3-Tier Architecture designed for scalability and performance.
 
-1.  **Frontend**: [Next.js](https://nextjs.org/) (React) - Handles UI, Animations (Framer Motion), and Authentication.
-2.  **Backend**: [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/) - Process business logic and manages data.
-3.  **Database**: [Supabase](https://supabase.com/) (PostgreSQL) - Stores user profiles, swipe history, and song metadata.
+### System Design
+```
+[Next.js Frontend]  <--HTTPS-->  [Node.js Express API]  <--TCP-->  [Supabase PostgreSQL]
+(Vercel)                         (Render/Railway)               (Supabase Cloud)
+```
+
+### Backend Structure (MVC)
+The backend is engineered for maintainability and separation of concerns:
+- **Controllers**: Business logic (e.g., `playlistController.js` handles daily playlist generation).
+- **Routes**: API endpoint definitions.
+- **Middleware**: Centralized validation (`zod`), error handling, and logging.
+- **DB**: Performance optimized with SQL indexes.
+
+### Key API Endpoints
+| Category | Method | Endpoint | Description |
+|----------|--------|----------|-------------|
+| **Action** | POST | `/action` | Records swipes/likes & auto-generates daily playlists |
+| **Social** | POST | `/follow` | Follow a user |
+| **Social** | GET | `/taste-match` | Calculates music compatibility % |
+| **Data** | GET | `/playlists/trending` | Returns top daily playlists |
 
 ## 🚀 Getting Started
 
@@ -86,6 +103,21 @@ npm run dev
 ## 🤝 Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+## ☁️ Deployment
+
+### Deploying Frontend (Vercel)
+Since this is a monorepo, you must configure Vercel to look in the `frontend` folder.
+1.  Go to **Settings** > **General**.
+2.  Find **Root Directory** section.
+3.  Click **Edit** and set it to: `frontend`.
+4.  Save and Redeploy.
+
+### Deploying Backend (Render/Railway)
+Deploy the `backend` folder as a separate web service.
+- **Build Command**: `npm install`
+- **Start Command**: `node index.js`
+- **Environment Variables**: Add `SUPABASE_URL` and `SUPABASE_KEY`.
 
 ## 📄 License
 
