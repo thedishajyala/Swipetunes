@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { HiOutlineMusicNote, HiOutlineSparkles, HiOutlineArrowRight } from "react-icons/hi";
 import SwipeCard from "../components/SwipeCard";
 import SkeletonCard from "../components/SkeletonCard";
+import { saveAction } from "@/lib/api";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -187,11 +188,22 @@ export default function Home() {
 
     if ((userId || session?.user?.id) && track) {
       const targetId = userId || session.user.id;
+      const spotifyId = session.user.spotify_id || session.user.id; // Use raw Spotify ID for external backend
 
       if (liked) {
         setStats(prev => ({ ...prev, swipes: prev.swipes + 1 }));
 
         try {
+          // --- NEW NODE.JS BACKEND CALL ---
+          await saveAction({
+            spotifyId: spotifyId,
+            songId: track.id,
+            songName: track.name,
+            artist: track.artists ? track.artists[0].name : track.artist,
+            action: "like",
+            image: (track.album && track.album.images && track.album.images[0]) ? track.album.images[0].url : track.coverImage
+          });
+
           // 0. Persist Track Data (Critical for History/Feeds)
           const { error: songError } = await supabase.from('songs').upsert({
             track_id: track.id,
@@ -224,6 +236,16 @@ export default function Home() {
         } catch (e) {
           console.error("Home: Failed to sync social signal:", e);
         }
+      } else {
+        // Log swipe/nope to backend as well (optional but good for data)
+        await saveAction({
+          spotifyId: spotifyId,
+          songId: track.id,
+          songName: track.name,
+          artist: track.artists ? track.artists[0].name : track.artist,
+          action: "swipe", // swipe left
+          image: (track.album && track.album.images && track.album.images[0]) ? track.album.images[0].url : track.coverImage
+        });
       }
     }
   };
