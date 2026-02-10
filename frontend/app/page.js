@@ -83,6 +83,30 @@ export default function Home() {
 
     try {
       const spotifyToken = session.accessToken;
+
+      // --- NEW STRATEGY: Prioritize User's Top Tracks (Requested) ---
+      if (!isMore) {
+        try {
+          console.log("Home: Fetching User Top Tracks directly for initial view...");
+          const directTopTracksRes = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=medium_term&limit=50', {
+            headers: { Authorization: `Bearer ${spotifyToken}` }
+          });
+
+          if (directTopTracksRes.ok) {
+            const directTopData = await directTopTracksRes.json();
+            const playableDirectTracks = (directTopData.items || []).filter(t => t.preview_url);
+
+            if (playableDirectTracks.length > 0) {
+              console.log(`Home: Using ${playableDirectTracks.length} playable top tracks.`);
+              setTracks(playableDirectTracks);
+              setLoadingMore(false);
+              return; // Exit early, use these tracks
+            }
+          }
+        } catch (e) {
+          console.warn("Home: Direct Top Tracks fetch failed, falling back to discovery...", e);
+        }
+      }
       let seedArtists = [];
       let seedGenres = [];
 
