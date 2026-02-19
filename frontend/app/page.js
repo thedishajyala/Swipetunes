@@ -42,6 +42,10 @@ export default function Home() {
         fetchTracks();
       }
     }
+    if (session?.error === "RefreshAccessTokenError") {
+      signIn(); // Force sign-in to get new refresh token
+      return;
+    }
     initUser();
     if (status !== "loading") setLoading(false);
   }, [session, status]);
@@ -178,7 +182,7 @@ export default function Home() {
       });
 
       if (!recsRes.ok) {
-        throw new Error("Recommendations API request failed");
+        throw new Error(`Recommendations API request failed: ${recsRes.status} ${recsRes.statusText}`);
       }
 
       const data = await recsRes.json();
@@ -197,7 +201,7 @@ export default function Home() {
     } catch (err) {
       console.error("Home: Failed to fetch tracks", err);
       // Fallback UI error
-      setError({ details: "Unable to curate feed. Please try again." });
+      setError({ details: err.message || "Unable to curate feed. Please try again." });
     }
     setLoadingMore(false);
   }
