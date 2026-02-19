@@ -137,7 +137,9 @@ export default function Home() {
             const topTracksData = await topTracksRes.json();
             const artists = new Set();
             (topTracksData.items || []).forEach(t => {
-              (t.artists || []).forEach(a => artists.add(a.id));
+              (t.artists || []).forEach(a => {
+                if (a.id) artists.add(a.id);
+              });
             });
             seedArtists = Array.from(artists).slice(0, 5);
           }
@@ -155,7 +157,12 @@ export default function Home() {
             const recentData = await recentRes.json();
             const artists = new Set();
             (recentData.items || []).forEach(item => {
-              (item.track.artists || []).forEach(a => artists.add(a.id));
+              // Check if track and artists exist (local files might not have IDs)
+              if (item.track && item.track.artists) {
+                item.track.artists.forEach(a => {
+                  if (a.id) artists.add(a.id);
+                });
+              }
             });
             seedArtists = Array.from(artists).slice(0, 5);
           }
@@ -177,12 +184,14 @@ export default function Home() {
       }
 
       console.log(`Home: Fetching recommendations with params: ${queryParams}`);
-      const recsRes = await fetch(`https://api.spotify.com/v1/recommendations?${queryParams}`, {
+      const url = `https://api.spotify.com/v1/recommendations?${queryParams}`;
+      console.log(`Home: Fetching recommendations from: ${url}`);
+      const recsRes = await fetch(url, {
         headers: { Authorization: `Bearer ${spotifyToken}` }
       });
 
       if (!recsRes.ok) {
-        throw new Error(`Recommendations API request failed: ${recsRes.status} ${recsRes.statusText}`);
+        throw new Error(`Recommendations API request failed: ${recsRes.status} ${recsRes.statusText} (URL: ${url})`);
       }
 
       const data = await recsRes.json();
