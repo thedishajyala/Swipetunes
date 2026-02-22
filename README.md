@@ -2,7 +2,7 @@
 
 > The Tinder for Music Discovery.
 
-SwipeTunes is a full-stack music discovery application that lets you explore new tracks with a fun, gesture-based interface. Connect your Spotify account, swipe right to like, left to pass, and build your music identity.
+SwipeTunes is a full-stack music discovery application that lets you explore new tracks with a fun, gesture-based interface. Connect your Spotify account, swipe right to like, left to pass, and build your music identity
 
 ![SwipeTunes Demo](https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop)
 
