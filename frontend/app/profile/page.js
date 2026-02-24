@@ -30,6 +30,7 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
     const [swipeStats, setSwipeStats] = useState({ likes: 0, total: 0, topArtist: null });
     const [badges, setBadges] = useState([]);
+    const [personality, setPersonality] = useState(null);
 
     useEffect(() => {
         async function fetchProfileData() {
@@ -51,6 +52,11 @@ export default function ProfilePage() {
                     fetch("/api/badge-check")
                         .then(r => r.json())
                         .then(data => { if (Array.isArray(data)) setBadges(data); });
+
+                    // Listening Personality
+                    fetch("/api/personality")
+                        .then(r => r.json())
+                        .then(data => { if (data?.name) setPersonality(data); });
 
                     setTopTracks(tracksData.items || []);
                     setTopArtists(artistsData.items.map(a => ({
@@ -273,6 +279,24 @@ export default function ProfilePage() {
 
             {/* Stats Dashboard */}
             <section className="space-y-6">
+                {/* Personality Card */}
+                {personality && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`relative overflow-hidden bg-gradient-to-br ${personality.gradient} border ${personality.border} rounded-[32px] p-8 flex items-center gap-6 mb-8`}
+                    >
+                        {/* Glow orb */}
+                        <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full blur-3xl opacity-20 bg-white pointer-events-none" />
+                        <span className="text-6xl shrink-0">{personality.emoji}</span>
+                        <div className="min-w-0">
+                            <p className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 mb-1">Your Listening Personality</p>
+                            <h3 className="text-3xl font-black text-white tracking-tighter leading-none">{personality.name}</h3>
+                            <p className="text-sm text-white/60 font-medium mt-1 italic">"{personality.tagline}"</p>
+                            <p className="text-xs text-white/40 font-medium mt-2 leading-relaxed max-w-sm">{personality.desc}</p>
+                        </div>
+                    </motion.div>
+                )}
                 <h2 className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
                     <HiOutlineSparkles className="text-[#1DB954]" /> Your SwipeTunes Stats
                 </h2>
@@ -382,8 +406,8 @@ export default function ProfilePage() {
                                 animate={{ opacity: 1, scale: 1 }}
                                 title={badge.desc}
                                 className={`flex flex-col items-center gap-2 p-4 rounded-2xl border text-center transition-all ${badge.earned
-                                        ? "bg-white/[0.06] border-[#1DB954]/30 shadow-lg shadow-[#1DB954]/10"
-                                        : "bg-white/[0.02] border-white/5 opacity-30 grayscale"
+                                    ? "bg-white/[0.06] border-[#1DB954]/30 shadow-lg shadow-[#1DB954]/10"
+                                    : "bg-white/[0.02] border-white/5 opacity-30 grayscale"
                                     }`}
                             >
                                 <span className="text-3xl">{badge.emoji}</span>
