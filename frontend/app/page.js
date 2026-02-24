@@ -88,128 +88,83 @@ export default function Home() {
     try {
       const spotifyToken = session.accessToken;
 
-      // --- NEW STRATEGY: Prioritize User's Top Tracks (Requested) ---
-      if (!isMore) {
-        try {
-          console.log("Home: Fetching User Top Tracks directly for initial view...");
-          const directTopTracksRes = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=medium_term&limit=50', {
-            headers: { Authorization: `Bearer ${spotifyToken}` }
-          });
+      // NOTE: Spotify deprecated /v1/recommendations in Nov 2024 (returns 404).
+      // We now use a multi-source strategy with working endpoints only.
 
-          if (directTopTracksRes.ok) {
-            const directTopData = await directTopTracksRes.json();
-            const playableDirectTracks = (directTopData.items || []).filter(t => t.preview_url);
-
-            if (playableDirectTracks.length > 0) {
-              console.log(`Home: Using ${playableDirectTracks.length} playable top tracks.`);
-              setTracks(playableDirectTracks);
-              setLoadingMore(false);
-              return; // Exit early, use these tracks
-            }
-          }
-        } catch (e) {
-          console.warn("Home: Direct Top Tracks fetch failed, falling back to discovery...", e);
-        }
-      }
-      let seedArtists = [];
-      let seedGenres = [];
-
-      // --- STRATEGY 1: Top Artists ---
-      console.log("Home: Attempting to fetch Top Artists...");
-      try {
-        const topArtistsRes = await fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
+      // Fetch from all 3 working sources in parallel
+      const [
+        shortTermRes,
+        mediumTermRes,
+        longTermRes,
+        recentRes,
+        savedRes,
+      ] = await Promise.allSettled([
+        fetch('https://api.spotify.com/v1/me/top/tracks?time_range=short_term&limit=50', {
           headers: { Authorization: `Bearer ${spotifyToken}` }
-        });
-        if (topArtistsRes.ok) {
-          const topArtistsData = await topArtistsRes.json();
-          seedArtists = (topArtistsData.items || []).map(a => a.id).slice(0, 5);
+        }),
+        fetch('https://api.spotify.com/v1/me/top/tracks?time_range=medium_term&limit=50', {
+          headers: { Authorization: `Bearer ${spotifyToken}` }
+        }),
+        fetch('https://api.spotify.com/v1/me/top/tracks?time_range=long_term&limit=50', {
+          headers: { Authorization: `Bearer ${spotifyToken}` }
+        }),
+        fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {
+          headers: { Authorization: `Bearer ${spotifyToken}` }
+        }),
+        fetch('https://api.spotify.com/v1/me/tracks?limit=50', {
+          headers: { Authorization: `Bearer ${spotifyToken}` }
+        }),
+      ]);
+
+      let allTracks = [];
+
+      // Helper to parse fulfilled JSON responses
+      const parseJson = async (settled) => {
+        if (settled.status === 'fulfilled' && settled.value.ok) {
+          return await settled.value.json();
         }
-      } catch (e) { console.warn("Home: Top Artists fetch failed", e); }
+        return null;
+      };
 
-      // --- STRATEGY 2: Top Tracks (Fallback) ---
-      if (seedArtists.length === 0) {
-        console.log("Home: Top Artists empty, trying Top Tracks...");
-        try {
-          const topTracksRes = await fetch('https://api.spotify.com/v1/me/top/tracks?limit=10', {
-            headers: { Authorization: `Bearer ${spotifyToken}` }
-          });
-          if (topTracksRes.ok) {
-            const topTracksData = await topTracksRes.json();
-            const artists = new Set();
-            (topTracksData.items || []).forEach(t => {
-              (t.artists || []).forEach(a => {
-                if (a.id) artists.add(a.id);
-              });
-            });
-            seedArtists = Array.from(artists).slice(0, 5);
-          }
-        } catch (e) { console.warn("Home: Top Tracks fetch failed", e); }
-      }
+      const [shortData, mediumData, longData, recentData, savedData] = await Promise.all([
+        parseJson(shortTermRes),
+        parseJson(mediumTermRes),
+        parseJson(longTermRes),
+        parseJson(recentRes),
+        parseJson(savedRes),
+      ]);
 
-      // --- STRATEGY 3: Recently Played (Fallback) ---
-      if (seedArtists.length === 0) {
-        console.log("Home: Top Tracks empty, trying Recently Played...");
-        try {
-          const recentRes = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=20', {
-            headers: { Authorization: `Bearer ${spotifyToken}` }
-          });
-          if (recentRes.ok) {
-            const recentData = await recentRes.json();
-            const artists = new Set();
-            (recentData.items || []).forEach(item => {
-              // Check if track and artists exist (local files might not have IDs)
-              if (item.track && item.track.artists) {
-                item.track.artists.forEach(a => {
-                  if (a.id) artists.add(a.id);
-                });
-              }
-            });
-            seedArtists = Array.from(artists).slice(0, 5);
-          }
-        } catch (e) { console.warn("Home: Recently Played fetch failed", e); }
-      }
+      if (shortData?.items) allTracks.push(...shortData.items);
+      if (mediumData?.items) allTracks.push(...mediumData.items);
+      if (longData?.items) allTracks.push(...longData.items);
+      if (recentData?.items) allTracks.push(...recentData.items.map(i => i.track).filter(Boolean));
+      if (savedData?.items) allTracks.push(...savedData.items.map(i => i.track).filter(Boolean));
 
-      // --- STRATEGY 4: Default Genres (Last Resort) ---
-      if (seedArtists.length === 0) {
-        console.log("Home: No history found, using Default Genres...");
-        seedGenres = ['pop', 'dance', 'hip-hop', 'indie', 'house'];
-      }
-
-      // --- EXECUTE RECOMMENDATIONS ---
-      let queryParams = `limit=50`;
-      if (seedArtists.length > 0) {
-        queryParams += `&seed_artists=${seedArtists.join(',')}`;
-      } else {
-        queryParams += `&seed_genres=${seedGenres.join(',')}`;
-      }
-
-      console.log(`Home: Fetching recommendations with params: ${queryParams}`);
-      const url = `https://api.spotify.com/v1/recommendations?${queryParams}`;
-      console.log(`Home: Fetching recommendations from: ${url}`);
-      const recsRes = await fetch(url, {
-        headers: { Authorization: `Bearer ${spotifyToken}` }
+      // Deduplicate by track ID
+      const seen = new Set();
+      const uniqueTracks = allTracks.filter(t => {
+        if (!t?.id || seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
       });
 
-      if (!recsRes.ok) {
-        throw new Error(`Recommendations API request failed: ${recsRes.status} ${recsRes.statusText} (URL: ${url})`);
-      }
+      // Shuffle for variety on each load
+      const shuffled = uniqueTracks.sort(() => Math.random() - 0.5);
 
-      const data = await recsRes.json();
+      // Prefer tracks with preview_url but include all if needed
+      const withPreview = shuffled.filter(t => t.preview_url);
+      const finalTracks = withPreview.length >= 5 ? withPreview : shuffled;
 
-      // Filter ONLY playable tracks
-      const playableTracks = (data.tracks || []).filter(t => t.preview_url);
+      console.log(`Home: Found ${finalTracks.length} tracks (${withPreview.length} with previews).`);
 
-      console.log(`Home: Found ${playableTracks.length} playable tracks.`);
-
-      if (playableTracks.length === 0) {
-        setError("We found music, but none with playable previews. Try listening to more music on Spotify first!");
+      if (finalTracks.length === 0) {
+        setError("No tracks found. Try listening to more music on Spotify first, then come back!");
       } else {
-        setTracks(prev => isMore ? [...prev, ...playableTracks] : playableTracks);
+        setTracks(prev => isMore ? [...prev, ...finalTracks] : finalTracks);
       }
 
     } catch (err) {
       console.error("Home: Failed to fetch tracks", err);
-      // Fallback UI error
       setError({ details: err.message || "Unable to curate feed. Please try again." });
     }
     setLoadingMore(false);
@@ -323,34 +278,94 @@ export default function Home() {
 
   if (!session) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] px-6 text-center">
+      <div className="flex flex-col items-center justify-center min-h-[80vh] px-6 text-center relative">
+        {/* Mesh background */}
+        <div className="mesh-bg absolute inset-0 pointer-events-none" />
+
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-2xl bg-white/[0.03] border border-white/5 p-12 rounded-[50px] backdrop-blur-3xl relative overflow-hidden"
+          transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+          style={{
+            maxWidth: '580px', width: '100%',
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            padding: '56px 48px',
+            borderRadius: '48px',
+            backdropFilter: 'blur(24px)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
         >
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#1DB954] to-transparent opacity-50" />
+          {/* Top accent */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+            background: 'linear-gradient(90deg, transparent, rgba(29,185,84,0.6), transparent)',
+          }} />
 
-          <div className="mb-10 inline-flex p-5 bg-[#1DB954]/10 rounded-3xl">
-            <HiOutlineSparkles className="text-4xl text-[#1DB954]" />
-          </div>
+          {/* Logo mark */}
+          <motion.div
+            animate={{ rotate: [0, 5, -3, 0] }}
+            transition={{ duration: 6, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' }}
+            style={{
+              display: 'inline-flex', padding: '18px',
+              background: 'rgba(29,185,84,0.1)',
+              borderRadius: '28px',
+              border: '1px solid rgba(29,185,84,0.2)',
+              marginBottom: '32px',
+            }}
+          >
+            <HiOutlineSparkles style={{ fontSize: '36px', color: '#1DB954' }} />
+          </motion.div>
 
-          <h1 className="text-7xl font-black tracking-tighter text-white mb-6">
-            Swipe. <span className="text-gray-500">Listen.</span> <br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#1DB954] to-[#1ed760]">Repeat.</span>
+          <h1 style={{
+            fontSize: '60px', fontWeight: 900, letterSpacing: '-2px',
+            lineHeight: 1.0, marginBottom: '20px', color: '#fff',
+          }}>
+            Swipe.{' '}
+            <span style={{ color: 'rgba(255,255,255,0.35)' }}>Listen.</span>
+            <br />
+            <span style={{
+              background: 'linear-gradient(135deg, #1DB954, #4ade80)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>Repeat.</span>
           </h1>
 
-          <p className="text-xl text-gray-400 font-medium mb-12 leading-relaxed">
-            The next generation of music discovery. Connect your Spotify to start swiping through your personal sonic universe.
+          <p style={{
+            fontSize: '17px', color: 'rgba(255,255,255,0.45)',
+            fontWeight: 500, lineHeight: 1.65, marginBottom: '44px',
+          }}>
+            The next generation of music discovery. Connect Spotify and start swiping through your personal sonic universe.
           </p>
 
           <button
             onClick={() => signIn('spotify')}
-            className="group relative px-10 py-5 bg-[#1DB954] text-black font-black rounded-full text-xl hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_20px_40px_rgba(29,185,84,0.3)] flex items-center gap-3 mx-auto"
+            className="glow-green"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '10px',
+              padding: '18px 40px',
+              background: '#1DB954',
+              color: '#000',
+              fontWeight: 800, fontSize: '16px',
+              borderRadius: '9999px',
+              border: 'none', cursor: 'pointer',
+              transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              letterSpacing: '-0.2px',
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+            onMouseUp={e => e.currentTarget.style.transform = 'scale(1.05)'}
           >
             Connect Spotify
-            <HiOutlineArrowRight className="group-hover:translate-x-1 transition-transform" />
+            <HiOutlineArrowRight style={{ fontSize: '18px' }} />
           </button>
+
+          {/* Subtle hint */}
+          <p style={{ marginTop: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.2)', fontWeight: 500 }}>
+            Free to use · No credit card required
+          </p>
         </motion.div>
       </div>
     );
@@ -440,18 +455,51 @@ export default function Home() {
       </div>
 
       {/* Floating Action Buttons */}
-      <div className="mt-12 flex gap-8 z-20">
+      <div style={{ marginTop: '40px', display: 'flex', gap: '28px', zIndex: 20, alignItems: 'center' }}>
+        {/* Nope */}
         <button
           onClick={() => { controls.start({ x: -500, opacity: 0, rotate: -20, transition: { duration: 0.4 } }); handleSwipe(false); }}
-          className="w-20 h-20 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center text-3xl hover:bg-red-500 hover:text-white hover:border-red-500 transition-all duration-500 group shadow-2xl"
+          style={{
+            width: '68px', height: '68px', borderRadius: '50%',
+            background: 'rgba(239,68,68,0.08)',
+            border: '1.5px solid rgba(239,68,68,0.25)',
+            color: '#ef4444', fontSize: '22px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'all 0.25s ease',
+            backdropFilter: 'blur(12px)',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(239,68,68,0.2)';
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(239,68,68,0.3)';
+            e.currentTarget.style.transform = 'scale(1.08)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(239,68,68,0.08)';
+            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
         >
-          <span className="group-hover:scale-125 transition-transform duration-500">✕</span>
+          ✕
         </button>
+
+        {/* Like */}
         <button
           onClick={() => { controls.start({ x: 500, opacity: 0, rotate: 20, transition: { duration: 0.4 } }); handleSwipe(true); }}
-          className="w-20 h-20 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center text-3xl hover:bg-[#1DB954] hover:text-black hover:border-[#1DB954] transition-all duration-500 group shadow-2xl"
+          className="glow-green"
+          style={{
+            width: '80px', height: '80px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, #1DB954, #15a041)',
+            border: 'none',
+            color: '#000', fontSize: '26px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'scale(1.1)'}
         >
-          <span className="group-hover:scale-125 transition-transform duration-500">♥</span>
+          ♥
         </button>
       </div>
     </div>
