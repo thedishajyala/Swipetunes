@@ -22,6 +22,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [selectedGenre, setSelectedGenre] = useState("All");
   const [allGenres, setAllGenres] = useState([]);
+  const [selectedDecade, setSelectedDecade] = useState("All");
 
   useEffect(() => {
     async function initUser() {
@@ -400,9 +401,12 @@ export default function Home() {
     );
   }
 
-  const filteredTracks = selectedGenre === "All"
-    ? tracks
-    : tracks.filter(t => (t.genres || []).some(g => g.toLowerCase().includes(selectedGenre.toLowerCase())));
+  const filteredTracks = tracks.filter(t => {
+    const genreOk = selectedGenre === "All" || (t.genres || []).some(g => g.toLowerCase().includes(selectedGenre.toLowerCase()));
+    const year = parseInt((t.album?.release_date || t.release_date || "").slice(0, 4));
+    const decadeOk = selectedDecade === "All" || (!isNaN(year) && year >= parseInt(selectedDecade) && year < parseInt(selectedDecade) + 10);
+    return genreOk && decadeOk;
+  });
   const track = filteredTracks[currentIndex];
 
 
@@ -479,21 +483,36 @@ export default function Home() {
       </AnimatePresence>
 
       <div className="relative z-10 w-full max-w-lg">
-        {/* Genre filter pills */}
-        {allGenres.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-center mb-6 px-2">
-            {["All", ...allGenres].map(genre => (
-              <button
-                key={genre}
-                onClick={() => { setSelectedGenre(genre); setCurrentIndex(0); }}
-                className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${selectedGenre === genre
-                  ? "bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
-                  }`}
+        {/* Genre filter pills + Decade dropdown */}
+        {(allGenres.length > 0) && (
+          <div className="flex flex-col gap-2 mb-6">
+            <div className="flex flex-wrap gap-2 justify-center px-2">
+              {["All", ...allGenres].map(genre => (
+                <button
+                  key={genre}
+                  onClick={() => { setSelectedGenre(genre); setCurrentIndex(0); }}
+                  className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${selectedGenre === genre
+                      ? "bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20"
+                      : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
+                    }`}
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
+            {/* Decade dropdown */}
+            <div className="flex justify-center">
+              <select
+                value={selectedDecade}
+                onChange={e => { setSelectedDecade(e.target.value); setCurrentIndex(0); }}
+                className="px-4 py-1.5 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white focus:outline-none focus:border-[#1DB954]/50 transition-colors cursor-pointer uppercase tracking-wider"
               >
-                {genre}
-              </button>
-            ))}
+                <option value="All">🗓 All Eras</option>
+                {["1960", "1970", "1980", "1990", "2000", "2010", "2020"].map(d => (
+                  <option key={d} value={d}>{d}s</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
         <SwipeCard
