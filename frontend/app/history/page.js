@@ -16,8 +16,19 @@ export default function LikedSongsPage() {
     const [view, setView] = useState("grid"); // "grid" | "list"
     const [exporting, setExporting] = useState(false);
     const [exportResult, setExportResult] = useState(null);
-    const [sort, setSort] = useState("newest"); // newest | oldest | title | artist
-    const [artistFilter, setArtistFilter] = useState("all"); // "all" or artist name
+    const [sort, setSort] = useState("newest");
+    const [artistFilter, setArtistFilter] = useState("all");
+    const [moods, setMoods] = useState({}); // { track_id: mood }
+    const [moodPicker, setMoodPicker] = useState(null); // track_id with picker open
+
+    const MOODS = [
+        { label: "Chill", emoji: "😌" },
+        { label: "Hype", emoji: "🔥" },
+        { label: "Sad", emoji: "😢" },
+        { label: "Happy", emoji: "😄" },
+        { label: "Focus", emoji: "🎯" },
+        { label: "Vibe", emoji: "✨" },
+    ];
 
     useEffect(() => {
         async function fetchLikes() {
@@ -37,7 +48,7 @@ export default function LikedSongsPage() {
             // Fetch likes joined with songs
             const { data: likes, error } = await supabase
                 .from("likes")
-                .select("track_id, created_at, songs(title, artist, album, cover_url, preview_url)")
+                .select("track_id, created_at, mood, songs(title, artist, album, cover_url, preview_url)")
                 .eq("user_id", internalId)
                 .order("created_at", { ascending: false });
 
@@ -55,6 +66,10 @@ export default function LikedSongsPage() {
                 }));
                 setTracks(formatted);
                 setFiltered(formatted);
+                // Build mood map
+                const moodMap = {};
+                (likes || []).forEach(l => { if (l.mood) moodMap[l.track_id] = l.mood; });
+                setMoods(moodMap);
             }
             setLoading(false);
         }
@@ -93,6 +108,16 @@ export default function LikedSongsPage() {
         audio.onended = () => { setPlaying(null); setAudioRef(null); };
         setPlaying(track.track_id);
         setAudioRef(audio);
+    }
+
+    async function updateMood(track_id, mood) {
+        setMoods(prev => ({ ...prev, [track_id]: mood }));
+        setMoodPicker(null);
+        await fetch("/api/mood", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ track_id, mood }),
+        });
     }
 
     async function exportToSpotify() {
@@ -306,9 +331,38 @@ export default function LikedSongsPage() {
                                     <p className="text-sm font-bold text-white truncate">{track.title}</p>
                                     <p className="text-[11px] font-black uppercase tracking-wider text-[#1DB954] truncate mt-0.5">{track.artist}</p>
                                 </div>
-                                <p className="text-[10px] text-gray-600 font-medium">
-                                    {new Date(track.liked_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                                </p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[10px] text-gray-600 font-medium">
+                                        {new Date(track.liked_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                    </p>
+                                    {/* Mood badge / picker trigger */}
+                                    <div className="relative" onClick={e => e.stopPropagation()}>
+                                        <button
+                                            onClick={() => setMoodPicker(moodPicker === track.track_id ? null : track.track_id)}
+                                            className="text-xs px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all"
+                                            title="Set mood"
+                                        >
+                                            {moods[track.track_id]
+                                                ? `${MOODS.find(m => m.label === moods[track.track_id])?.emoji} ${moods[track.track_id]}`
+                                                : "＋ Mood"}
+                                        </button>
+                                        {moodPicker === track.track_id && (
+                                            <div className="absolute bottom-full right-0 mb-2 z-20 bg-[#111] border border-white/10 rounded-2xl p-2 grid grid-cols-3 gap-1 shadow-2xl w-36">
+                                                {MOODS.map(m => (
+                                                    <button
+                                                        key={m.label}
+                                                        onClick={() => updateMood(track.track_id, moods[track.track_id] === m.label ? null : m.label)}
+                                                        className={`flex flex-col items-center py-1.5 rounded-xl text-[10px] font-black transition-all ${moods[track.track_id] === m.label ? "bg-[#1DB954] text-black" : "hover:bg-white/10 text-gray-300"}`}
+                                                    >
+                                                        <span className="text-base">{m.emoji}</span>
+                                                        {m.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                             </motion.div>
                         ))}
                     </motion.div>
