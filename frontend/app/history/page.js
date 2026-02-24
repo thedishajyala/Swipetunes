@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiOutlineHeart, HiOutlineMusicNote, HiOutlineSearch, HiOutlinePlay } from "react-icons/hi";
+import { HiOutlineHeart, HiOutlineMusicNote, HiOutlineSearch, HiOutlinePlay, HiOutlineExternalLink } from "react-icons/hi";
 
 export default function LikedSongsPage() {
     const { data: session } = useSession();
@@ -14,6 +14,8 @@ export default function LikedSongsPage() {
     const [playing, setPlaying] = useState(null); // track_id of currently playing preview
     const [audioRef, setAudioRef] = useState(null);
     const [view, setView] = useState("grid"); // "grid" | "list"
+    const [exporting, setExporting] = useState(false);
+    const [exportResult, setExportResult] = useState(null); // { playlistUrl, trackCount }
 
     useEffect(() => {
         async function fetchLikes() {
@@ -88,6 +90,24 @@ export default function LikedSongsPage() {
         setAudioRef(audio);
     }
 
+    async function exportToSpotify() {
+        setExporting(true);
+        setExportResult(null);
+        try {
+            const res = await fetch("/api/export-playlist", { method: "POST" });
+            const data = await res.json();
+            if (data.playlistUrl) {
+                setExportResult(data);
+                window.open(data.playlistUrl, "_blank");
+            } else {
+                setExportResult({ error: data.error || "Export failed." });
+            }
+        } catch (e) {
+            setExportResult({ error: "Something went wrong." });
+        }
+        setExporting(false);
+    }
+
     if (loading) return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-sm font-black uppercase tracking-[0.3em] opacity-20 animate-pulse">Loading Liked Songs...</div>
@@ -123,29 +143,55 @@ export default function LikedSongsPage() {
                 </div>
 
                 {/* Controls */}
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    {/* Search */}
-                    <div className="relative flex-1 md:w-64">
-                        <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <input
-                            type="text"
-                            placeholder="Search songs, artists..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-[#1DB954]/50 transition-colors"
-                        />
-                    </div>
-                    {/* View toggle */}
-                    <div className="flex bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-                        {["grid", "list"].map(v => (
+                <div className="flex flex-col gap-3 w-full md:w-auto">
+                    {/* Export button */}
+                    {tracks.length > 0 && (
+                        <div className="flex flex-col items-end gap-2">
                             <button
-                                key={v}
-                                onClick={() => setView(v)}
-                                className={`px-4 py-3 text-xs font-black uppercase tracking-widest transition-all ${view === v ? "bg-[#1DB954] text-black" : "text-gray-500 hover:text-white"}`}
+                                onClick={exportToSpotify}
+                                disabled={exporting}
+                                className="flex items-center gap-2 px-5 py-3 bg-[#1DB954] text-black font-black text-sm rounded-2xl hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-[#1DB954]/20"
                             >
-                                {v === "grid" ? "⊞" : "≡"}
+                                {exporting ? (
+                                    <><span className="animate-spin">↻</span> Exporting...</>
+                                ) : (
+                                    <><HiOutlineExternalLink className="text-base" /> Export to Spotify</>
+                                )}
                             </button>
-                        ))}
+                            {exportResult && (
+                                <p className={`text-xs font-bold ${exportResult.error ? "text-red-400" : "text-[#1DB954]"}`}>
+                                    {exportResult.error
+                                        ? `⚠ ${exportResult.error}`
+                                        : `✓ Playlist created with ${exportResult.trackCount} tracks!`
+                                    }
+                                </p>
+                            )}
+                        </div>
+                    )}
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        {/* Search */}
+                        <div className="relative flex-1 md:w-64">
+                            <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                            <input
+                                type="text"
+                                placeholder="Search songs, artists..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-[#1DB954]/50 transition-colors"
+                            />
+                        </div>
+                        {/* View toggle */}
+                        <div className="flex bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                            {["grid", "list"].map(v => (
+                                <button
+                                    key={v}
+                                    onClick={() => setView(v)}
+                                    className={`px-4 py-3 text-xs font-black uppercase tracking-widest transition-all ${view === v ? "bg-[#1DB954] text-black" : "text-gray-500 hover:text-white"}`}
+                                >
+                                    {v === "grid" ? "⊞" : "≡"}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </motion.div>
