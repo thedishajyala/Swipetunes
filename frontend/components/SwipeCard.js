@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { HiOutlinePlay, HiOutlinePause, HiOutlineShare, HiVolumeUp, HiVolumeOff } from "react-icons/hi";
+import { HiOutlinePlay, HiOutlinePause, HiOutlineShare, HiVolumeOff } from "react-icons/hi";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+
+// Deterministic waveform heights to avoid hydration mismatch
+const WAVE_HEIGHTS = [
+    6, 14, 22, 10, 28, 16, 8, 24, 18, 12,
+    26, 8, 20, 14, 28, 10, 22, 16, 8, 18
+];
 
 export default function SwipeCard({ track, swipeDirection, dragHandlers, controls }) {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -14,10 +21,7 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                 if (isPlaying) {
                     audioRef.current.pause();
                 } else {
-                    const playPromise = audioRef.current.play();
-                    if (playPromise !== undefined) {
-                        await playPromise;
-                    }
+                    await audioRef.current.play();
                 }
                 setIsPlaying(!isPlaying);
                 setShowInteractionPrompt(false);
@@ -34,30 +38,25 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
     useEffect(() => {
         setIsPlaying(false);
         setShowInteractionPrompt(false);
-
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
-
             if (previewSrc) {
-                const playTimeout = setTimeout(() => {
-                    const playPromise = audioRef.current.play();
-                    if (playPromise !== undefined) {
-                        playPromise
-                            .then(() => {
-                                setIsPlaying(true);
-                            })
-                            .catch(err => {
-                                console.log("Autoplay blocked. Showing prompt.", err);
-                                setIsPlaying(false);
-                                setShowInteractionPrompt(true);
-                            });
-                    }
+                const t = setTimeout(() => {
+                    audioRef.current?.play()
+                        .then(() => setIsPlaying(true))
+                        .catch(() => { setIsPlaying(false); setShowInteractionPrompt(true); });
                 }, 600);
-                return () => clearTimeout(playTimeout);
+                return () => clearTimeout(t);
             }
         }
     }, [track, previewSrc]);
+
+    const coverSrc = track.coverImage || track.cover_url || track.album?.images?.[0]?.url;
+    const trackName = track.name || track.title;
+    const artistName = track.artist || track.artists?.[0]?.name;
+    const artistId = track.artists?.[0]?.id || null;
+    const trackId = track.id || track.track_id;
 
     return (
         <motion.div
@@ -65,37 +64,58 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
             dragConstraints={{ left: 0, right: 0 }}
             {...dragHandlers}
             animate={controls}
-            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+            initial={{ scale: 0.94, opacity: 0, y: 24 }}
             whileInView={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className="relative w-full aspect-[3/4] max-h-[600px] rounded-[50px] overflow-hidden cursor-grab active:cursor-grabbing group shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10"
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ type: "spring", stiffness: 280, damping: 22 }}
+            style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: '3/4',
+                maxHeight: '600px',
+                borderRadius: '40px',
+                overflow: 'hidden',
+                cursor: 'grab',
+                boxShadow: '0 40px 100px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.07)',
+                userSelect: 'none',
+            }}
+            whileDrag={{ cursor: 'grabbing' }}
         >
-            {/* Grainy Texture */}
-            <div className="absolute inset-0 opacity-[0.05] pointer-events-none z-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-
             {/* Album Art */}
-            <div className="absolute inset-0 bg-gray-900">
-                {(track.coverImage || track.cover_url || (track.album?.images && track.album.images[0]?.url)) ? (
+            <div style={{ position: 'absolute', inset: 0, background: '#111' }}>
+                {coverSrc ? (
                     <img
-                        src={track.coverImage || track.cover_url || track.album?.images[0]?.url}
-                        alt={track.name || track.title}
-                        className={`w-full h-full object-cover transition-transform duration-[2000ms] ease-out ${isPlaying ? "scale-110" : "scale-100"}`}
+                        src={coverSrc}
+                        alt={trackName}
+                        style={{
+                            width: '100%', height: '100%',
+                            objectFit: 'cover',
+                            transition: 'transform 2s ease-out',
+                            transform: isPlaying ? 'scale(1.08)' : 'scale(1.01)',
+                        }}
                         draggable="false"
-                        onError={(e) => {
+                        onError={e => {
                             e.target.src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop";
                         }}
                     />
                 ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
-                        <span className="text-white/20 font-black uppercase tracking-widest text-xs">No Cover</span>
+                    <div style={{
+                        width: '100%', height: '100%',
+                        background: 'linear-gradient(135deg, #111 0%, #1a1a2e 100%)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                        <span style={{ color: 'rgba(255,255,255,0.1)', fontWeight: 800, fontSize: '12px', letterSpacing: '3px', textTransform: 'uppercase' }}>No Cover</span>
                     </div>
                 )}
-                {/* Overlays */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/90 z-0" />
+
+                {/* Gradient overlays */}
+                <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, transparent 40%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.97) 100%)',
+                }} />
             </div>
 
-            {/* Tap to Listen Overlay (If Autoplay Blocked AND Audio Exists) */}
+            {/* Tap to Listen */}
             <AnimatePresence>
                 {showInteractionPrompt && hasAudio && (
                     <motion.div
@@ -103,95 +123,193 @@ export default function SwipeCard({ track, swipeDirection, dragHandlers, control
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={togglePlay}
-                        className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer"
+                        style={{
+                            position: 'absolute', inset: 0, zIndex: 30,
+                            display: 'flex', flexDirection: 'column',
+                            alignItems: 'center', justifyContent: 'center',
+                            background: 'rgba(0,0,0,0.5)',
+                            backdropFilter: 'blur(4px)',
+                            cursor: 'pointer',
+                        }}
                     >
-                        <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center animate-pulse">
-                            <HiOutlinePlay className="text-4xl text-white ml-1" />
+                        <div style={{
+                            position: 'relative',
+                            width: '72px', height: '72px',
+                            borderRadius: '50%',
+                            background: 'rgba(29,185,84,0.15)',
+                            border: '1.5px solid rgba(29,185,84,0.5)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                            <HiOutlinePlay style={{ fontSize: '28px', color: '#1DB954', marginLeft: '3px' }} />
+                            <div className="pulse-ring" />
                         </div>
-                        <p className="mt-4 text-xs font-black uppercase tracking-widest text-white">Tap to Listen</p>
+                        <p style={{ marginTop: '14px', fontSize: '11px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
+                            Tap to Listen
+                        </p>
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Swipe Indicators */}
-            {swipeDirection === "right" && (
-                <div className="absolute top-10 left-10 border-4 border-[#1DB954] rounded-2xl px-6 py-2 -rotate-12 z-20 bg-[#1DB954]/20 backdrop-blur-md">
-                    <span className="text-[#1DB954] text-5xl font-black uppercase tracking-tighter">Like</span>
-                </div>
-            )}
-            {swipeDirection === "left" && (
-                <div className="absolute top-10 right-10 border-4 border-red-500 rounded-2xl px-6 py-2 rotate-12 z-20 bg-red-500/20 backdrop-blur-md">
-                    <span className="text-red-500 text-5xl font-black uppercase tracking-tighter">Nope</span>
-                </div>
-            )}
+            <AnimatePresence>
+                {swipeDirection === "right" && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.7, rotate: -20 }}
+                        animate={{ opacity: 1, scale: 1, rotate: -12 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'absolute', top: '36px', left: '28px', zIndex: 20,
+                            border: '3px solid #1DB954',
+                            borderRadius: '12px',
+                            padding: '4px 16px',
+                            background: 'rgba(29,185,84,0.15)',
+                            backdropFilter: 'blur(8px)',
+                        }}
+                    >
+                        <span style={{ color: '#1DB954', fontSize: '36px', fontWeight: 900, letterSpacing: '-1px', textTransform: 'uppercase', lineHeight: 1.2 }}>Like</span>
+                    </motion.div>
+                )}
+                {swipeDirection === "left" && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.7, rotate: 20 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 12 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'absolute', top: '36px', right: '28px', zIndex: 20,
+                            border: '3px solid #ef4444',
+                            borderRadius: '12px',
+                            padding: '4px 16px',
+                            background: 'rgba(239,68,68,0.15)',
+                            backdropFilter: 'blur(8px)',
+                        }}
+                    >
+                        <span style={{ color: '#ef4444', fontSize: '36px', fontWeight: 900, letterSpacing: '-1px', textTransform: 'uppercase', lineHeight: 1.2 }}>Nope</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            {/* Content Bottom */}
-            <div className="absolute bottom-0 inset-x-0 p-8 z-20 flex flex-col gap-6 bg-gradient-to-t from-black via-black/60 to-transparent pt-24">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-black text-white tracking-tighter line-clamp-1 group-hover:tracking-tight transition-all duration-500">
-                        {track.name || track.title}
+            {/* Bottom Content */}
+            <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                padding: '32px 28px 28px',
+                zIndex: 20,
+            }}>
+                {/* Track info */}
+                <div style={{ marginBottom: '20px' }}>
+                    <h1 style={{
+                        fontSize: '28px', fontWeight: 800, color: '#fff',
+                        letterSpacing: '-0.5px',
+                        marginBottom: '6px',
+                        lineHeight: 1.1,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                        {trackName}
                     </h1>
-                    <p className="text-lg text-gray-300 font-bold uppercase tracking-widest text-xs opacity-80">
-                        {track.artist || (track.artists && track.artists[0]?.name)}
+                    <p style={{
+                        fontSize: '13px', fontWeight: 600,
+                        color: 'rgba(255,255,255,0.55)',
+                        letterSpacing: '1px', textTransform: 'uppercase',
+                    }}>
+                        {artistId ? (
+                            <Link
+                                href={`/artist/${artistId}`}
+                                onPointerDown={e => e.stopPropagation()}
+                                onClick={e => e.stopPropagation()}
+                                style={{ color: 'inherit', textDecoration: 'none' }}
+                            >
+                                {artistName}
+                            </Link>
+                        ) : artistName}
                     </p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                {/* Controls row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    {/* Play button */}
                     <button
                         onClick={hasAudio ? togglePlay : undefined}
-                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerDown={e => e.stopPropagation()}
                         disabled={!hasAudio}
-                        className={`w-16 h-16 rounded-3xl flex items-center justify-center text-2xl transition-all shadow-xl ${hasAudio
-                            ? "bg-white text-black hover:scale-105 active:scale-95 cursor-pointer"
-                            : "bg-white/10 text-white/40 cursor-not-allowed border border-white/5"
-                            }`}
+                        style={{
+                            width: '56px', height: '56px', borderRadius: '18px', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '22px', cursor: hasAudio ? 'pointer' : 'not-allowed',
+                            border: 'none', transition: 'all 0.2s ease',
+                            ...(hasAudio ? {
+                                background: '#1DB954',
+                                color: '#000',
+                                boxShadow: '0 4px 20px rgba(29,185,84,0.45)',
+                            } : {
+                                background: 'rgba(255,255,255,0.08)',
+                                color: 'rgba(255,255,255,0.3)',
+                            }),
+                        }}
                     >
-                        {!hasAudio ? <HiVolumeOff /> : (isPlaying ? <HiOutlinePause /> : <HiOutlinePlay className="ml-1" />)}
+                        {!hasAudio ? <HiVolumeOff /> : (isPlaying ? <HiOutlinePause /> : <HiOutlinePlay style={{ marginLeft: '2px' }} />)}
                     </button>
 
+                    {/* Share button */}
                     <button
-                        onClick={(e) => {
+                        onClick={e => {
                             e.stopPropagation();
-                            const trackId = track.id || track.track_id;
                             window.dispatchEvent(new CustomEvent('share-track', { detail: { trackId, track } }));
                         }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-xl transition-all"
+                        onPointerDown={e => e.stopPropagation()}
+                        style={{
+                            width: '44px', height: '44px', borderRadius: '14px', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '18px', cursor: 'pointer',
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            color: 'rgba(255,255,255,0.6)',
+                            transition: 'all 0.2s ease',
+                        }}
                         title="Share with curator"
                     >
                         <HiOutlineShare />
                     </button>
 
-                    <div className="flex-1 h-1 flex items-center gap-1">
-                        {[...Array(20)].map((_, i) => (
+                    {/* Waveform */}
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '2px', height: '32px' }}>
+                        {WAVE_HEIGHTS.map((h, i) => (
                             <div
                                 key={i}
-                                className={`flex-1 rounded-full transition-all duration-500 ${isPlaying ? "animate-pulse bg-[#1DB954]" : "h-1 bg-white/20"}`}
+                                className={isPlaying ? "wave-bar" : ""}
                                 style={{
-                                    height: isPlaying ? `${Math.random() * 24 + 4}px` : "2px",
-                                    animationDelay: `${i * 0.05}s`
+                                    flex: 1,
+                                    height: isPlaying ? `${h}px` : '3px',
+                                    background: isPlaying ? '#1DB954' : 'rgba(255,255,255,0.15)',
+                                    borderRadius: '9999px',
+                                    transition: 'height 0.3s ease',
+                                    animationDelay: isPlaying ? `${i * 0.06}s` : '0s',
+                                    animationDuration: isPlaying ? `${0.6 + (i % 5) * 0.1}s` : '0s',
                                 }}
                             />
                         ))}
                     </div>
                 </div>
 
-                <div className="flex justify-center mt-4">
+                {/* Spotify link */}
+                <div style={{ marginTop: '20px', textAlign: 'center' }}>
                     <a
-                        href={`https://open.spotify.com/track/${track.id || track.track_id}`}
+                        href={`https://open.spotify.com/track/${trackId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs font-bold uppercase tracking-widest text-[#1DB954] hover:text-white transition-colors flex items-center gap-2"
+                        onPointerDown={e => e.stopPropagation()}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            fontSize: '11px', fontWeight: 700,
+                            letterSpacing: '1.5px', textTransform: 'uppercase',
+                            color: 'rgba(29,185,84,0.8)',
+                            textDecoration: 'none',
+                            display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        }}
                     >
-                        <span>▶ Play Full Song on Spotify</span>
+                        <span>▶</span> Open on Spotify
                     </a>
                 </div>
 
-                {hasAudio && (
-                    <audio ref={audioRef} src={previewSrc} onEnded={() => setIsPlaying(false)} className="hidden" />
-                )}
+                {hasAudio && <audio ref={audioRef} src={previewSrc} onEnded={() => setIsPlaying(false)} className="hidden" />}
             </div>
         </motion.div>
     );
