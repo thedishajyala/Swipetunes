@@ -20,6 +20,8 @@ export default function Home() {
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedGenre, setSelectedGenre] = useState("All");
+  const [allGenres, setAllGenres] = useState([]);
 
   useEffect(() => {
     async function initUser() {
@@ -155,12 +157,39 @@ export default function Home() {
       const withPreview = shuffled.filter(t => t.preview_url);
       const finalTracks = withPreview.length >= 5 ? withPreview : shuffled;
 
-      console.log(`Home: Found ${finalTracks.length} tracks (${withPreview.length} with previews).`);
+      // Enrich with artist genres (batch artist IDs, max 50 per call)
+      const artistIds = [...new Set(finalTracks
+        .map(t => t.artists?.[0]?.id).filter(Boolean))].slice(0, 50);
+      let genreMap = {};
+      if (artistIds.length > 0 && session?.accessToken) {
+        try {
+          const artistRes = await fetch(
+            `https://api.spotify.com/v1/artists?ids=${artistIds.join(",")}`,
+            { headers: { Authorization: `Bearer ${spotifyToken}` } }
+          );
+          if (artistRes.ok) {
+            const artistData = await artistRes.json();
+            (artistData.artists || []).forEach(a => { genreMap[a.id] = a.genres || []; });
+          }
+        } catch { /* genre enrichment is optional */ }
+      }
+      const enriched = finalTracks.map(t => ({
+        ...t,
+        genres: genreMap[t.artists?.[0]?.id] || []
+      }));
 
-      if (finalTracks.length === 0) {
+      // Collect unique genres for filter pills
+      const genreSet = new Set();
+      enriched.forEach(t => t.genres.slice(0, 2).forEach(g => genreSet.add(g)));
+      const topGenres = [...genreSet].slice(0, 10);
+      setAllGenres(topGenres);
+
+      console.log(`Home: Found ${enriched.length} tracks (${withPreview.length} with previews).`);
+
+      if (enriched.length === 0) {
         setError("No tracks found. Try listening to more music on Spotify first, then come back!");
       } else {
-        setTracks(prev => isMore ? [...prev, ...finalTracks] : finalTracks);
+        setTracks(prev => isMore ? [...prev, ...enriched] : enriched);
       }
 
     } catch (err) {
@@ -371,7 +400,11 @@ export default function Home() {
     );
   }
 
-  const track = tracks[currentIndex];
+  const filteredTracks = selectedGenre === "All"
+    ? tracks
+    : tracks.filter(t => (t.genres || []).some(g => g.toLowerCase().includes(selectedGenre.toLowerCase())));
+  const track = filteredTracks[currentIndex];
+
 
   if (!tracks.length && !loading) return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
@@ -446,6 +479,23 @@ export default function Home() {
       </AnimatePresence>
 
       <div className="relative z-10 w-full max-w-lg">
+        {/* Genre filter pills */}
+        {allGenres.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-center mb-6 px-2">
+            {["All", ...allGenres].map(genre => (
+              <button
+                key={genre}
+                onClick={() => { setSelectedGenre(genre); setCurrentIndex(0); }}
+                className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${selectedGenre === genre
+                  ? "bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20"
+                  : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
+                  }`}
+              >
+                {genre}
+              </button>
+            ))}
+          </div>
+        )}
         <SwipeCard
           track={track}
           swipeDirection={swipeDirection}
