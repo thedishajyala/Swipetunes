@@ -28,6 +28,7 @@ export default function ProfilePage() {
     const [challenges, setChallenges] = useState([]);
     const [recalculating, setRecalculating] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [swipeStats, setSwipeStats] = useState({ likes: 0, total: 0, topArtist: null });
 
     useEffect(() => {
         async function fetchProfileData() {
@@ -72,6 +73,32 @@ export default function ProfilePage() {
                     const challengesRes = await fetch('/api/challenges');
                     const challengesData = await challengesRes.json();
                     if (Array.isArray(challengesData)) setChallenges(challengesData);
+
+                    // --- Swipe Stats ---
+                    const lookupId = session.user.spotify_id || session.user.id;
+                    const { data: userProfile } = await supabase
+                        .from('users').select('id').eq('spotify_id', lookupId).maybeSingle();
+                    const internalId = userProfile ? userProfile.id : session.user.id;
+
+                    const [likesData, actionsData] = await Promise.all([
+                        supabase.from('likes').select('track_id, songs(artist)').eq('user_id', internalId),
+                        supabase.from('likes').select('*', { count: 'exact', head: true }).eq('user_id', internalId)
+                    ]);
+
+                    const likeCount = actionsData.count || 0;
+                    // Compute favourite artist from likes
+                    const artistCounts = {};
+                    (likesData.data || []).forEach(l => {
+                        const a = l.songs?.artist;
+                        if (a) artistCounts[a] = (artistCounts[a] || 0) + 1;
+                    });
+                    const topArtistEntry = Object.entries(artistCounts).sort((a, b) => b[1] - a[1])[0];
+                    setSwipeStats({
+                        likes: likeCount,
+                        topArtist: topArtistEntry ? topArtistEntry[0] : null,
+                        topArtistCount: topArtistEntry ? topArtistEntry[1] : 0,
+                    });
+
                 } catch (error) {
                     console.error("Error fetching profile data:", error);
                 } finally {
@@ -236,6 +263,32 @@ export default function ProfilePage() {
                     )}
                 </AnimatePresence>
             </motion.section>
+
+            {/* Stats Dashboard */}
+            <section className="space-y-6">
+                <h2 className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
+                    <HiOutlineSparkles className="text-[#1DB954]" /> Your SwipeTunes Stats
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                        { label: "Songs Liked", value: swipeStats.likes, icon: "❤️", color: "from-pink-500/20 to-red-500/20", border: "border-pink-500/20" },
+                        { label: "Fave Artist", value: swipeStats.topArtist || "—", icon: "🎤", color: "from-purple-500/20 to-indigo-500/20", border: "border-purple-500/20", small: true },
+                        { label: "Artist Likes", value: swipeStats.topArtistCount || "—", icon: "🔁", color: "from-blue-500/20 to-cyan-500/20", border: "border-blue-500/20" },
+                        { label: "Identity Level", value: `Lv ${stats.level}`, icon: "⚡", color: "from-[#1DB954]/20 to-emerald-500/20", border: "border-[#1DB954]/20" },
+                    ].map(({ label, value, icon, color, border, small }) => (
+                        <motion.div
+                            key={label}
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`bg-gradient-to-br ${color} border ${border} p-6 rounded-[28px] flex flex-col gap-2`}
+                        >
+                            <span className="text-2xl">{icon}</span>
+                            <span className={`font-black text-white truncate ${small ? "text-lg" : "text-3xl"}`}>{value}</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{label}</span>
+                        </motion.div>
+                    ))}
+                </div>
+            </section>
 
             {/* Gamification Dashboard */}
             <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
