@@ -14,7 +14,9 @@ import {
     HiOutlineUserCircle,
     HiOutlineClock,
     HiOutlineCalendar,
+    HiOutlineTrendingUp,
 } from "react-icons/hi";
+
 
 export default function Sidebar() {
     const { data: session } = useSession();
@@ -53,10 +55,12 @@ export default function Sidebar() {
         { name: "Swipe", path: "/", icon: <HiOutlineMusicNote size={20} /> },
         { name: "People", path: "/people", icon: <HiOutlineUserGroup size={20} /> },
         { name: "Trending", path: "/trending", icon: <HiOutlineFire size={20} /> },
+        { name: "Leaderboard", path: "/leaderboard", icon: <HiOutlineTrendingUp size={20} /> },
         { name: "My Identity", path: "/profile", icon: <HiOutlineUserCircle size={20} /> },
         { name: "Liked Songs", path: "/history", icon: <HiOutlineClock size={20} /> },
         { name: "Swipe History", path: "/swipe-history", icon: <HiOutlineCalendar size={20} /> },
     ];
+
 
     return (
         <div className="fixed left-0 top-0 h-full w-64 flex flex-col z-50"
