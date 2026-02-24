@@ -269,11 +269,13 @@ export default function ProfilePage() {
                 <h2 className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
                     <HiOutlineSparkles className="text-[#1DB954]" /> Your SwipeTunes Stats
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                     {[
                         { label: "Songs Liked", value: swipeStats.likes, icon: "❤️", color: "from-pink-500/20 to-red-500/20", border: "border-pink-500/20" },
                         { label: "Fave Artist", value: swipeStats.topArtist || "—", icon: "🎤", color: "from-purple-500/20 to-indigo-500/20", border: "border-purple-500/20", small: true },
                         { label: "Artist Likes", value: swipeStats.topArtistCount || "—", icon: "🔁", color: "from-blue-500/20 to-cyan-500/20", border: "border-blue-500/20" },
+                        { label: "Day Streak", value: `${stats.streak_count || 0}`, icon: "🔥", color: "from-orange-500/20 to-red-500/20", border: "border-orange-500/20" },
+
                         { label: "Identity Level", value: `Lv ${stats.level}`, icon: "⚡", color: "from-[#1DB954]/20 to-emerald-500/20", border: "border-[#1DB954]/20" },
                     ].map(({ label, value, icon, color, border, small }) => (
                         <motion.div

@@ -33,11 +33,28 @@ export async function POST(request) {
 
         let newXp = (stats?.xp || 0) + xpToAdd;
         let newLevel = stats?.level || 1;
+        let newStreak = stats?.streak_count || 0;
+
+        // --- Streak Logic ---
+        const today = new Date().toISOString().slice(0, 10);
+        const lastActive = stats?.last_activity ? stats.last_activity.slice(0, 10) : null;
+
+        if (action === 'swipe_like') {
+            if (lastActive === today) {
+                // Already active today — streak unchanged
+            } else {
+                const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+                if (lastActive === yesterday) {
+                    newStreak += 1; // Streak continues
+                    newXp += XP_MAP['daily_streak']; // Bonus XP for streak
+                } else {
+                    newStreak = 1; // Streak reset
+                }
+            }
+        }
 
         // Simple level logic: Level up every 500 XP
-        if (newXp >= newLevel * 500) {
-            newLevel += 1;
-        }
+        if (newXp >= newLevel * 500) newLevel += 1;
 
         // 2. Update or Insert stats
         const { error: updateError } = await supabaseAdmin
@@ -46,16 +63,18 @@ export async function POST(request) {
                 user_id: userId,
                 xp: newXp,
                 level: newLevel,
+                streak_count: newStreak,
                 last_activity: new Date().toISOString()
             });
 
         if (updateError) throw updateError;
 
-        return NextResponse.json({ xpBalance: newXp, level: newLevel, added: xpToAdd });
+        return NextResponse.json({ xpBalance: newXp, level: newLevel, streak: newStreak, added: xpToAdd });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
 
 export async function GET(request) {
     const session = await getServerSession(authOptions);
