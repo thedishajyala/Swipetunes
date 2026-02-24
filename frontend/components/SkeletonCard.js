@@ -1,17 +1,67 @@
 export default function SkeletonCard() {
     return (
-        <div className="relative w-full aspect-[3/4] max-h-[600px] rounded-[50px] overflow-hidden bg-white/[0.02] border border-white/5 animate-pulse shadow-2xl">
-            <div className="absolute inset-0 bg-gray-900/50" />
+        <div style={{
+            position: 'relative',
+            width: '100%',
+            aspectRatio: '3/4',
+            maxHeight: '600px',
+            borderRadius: '40px',
+            overflow: 'hidden',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            boxShadow: '0 40px 80px rgba(0,0,0,0.5)',
+        }}>
+            {/* Shimmer overlay */}
+            <div className="shimmer" style={{ position: 'absolute', inset: 0 }} />
 
-            <div className="absolute bottom-0 inset-x-0 p-8 flex flex-col gap-6 pt-24">
-                <div className="space-y-3">
-                    <div className="h-10 bg-white/10 rounded-2xl w-3/4" />
-                    <div className="h-4 bg-white/5 rounded-full w-1/4" />
+            {/* Background gradient */}
+            <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.8) 100%)',
+            }} />
+
+            {/* Animated pulse rings in center */}
+            <div style={{
+                position: 'absolute', top: '40%', left: '50%',
+                transform: 'translate(-50%, -50%)',
+            }}>
+                <div style={{
+                    width: '56px', height: '56px', borderRadius: '50%',
+                    background: 'rgba(29,185,84,0.08)',
+                    border: '1px solid rgba(29,185,84,0.15)',
+                    animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                    <div style={{
+                        width: '20px', height: '20px', borderRadius: '50%',
+                        background: 'rgba(29,185,84,0.3)',
+                    }} />
                 </div>
+            </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-3xl bg-white/10" />
-                    <div className="flex-1 h-1 bg-white/5 rounded-full" />
+            {/* Bottom skeleton */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '32px 28px 28px' }}>
+                <div style={{ marginBottom: '20px' }}>
+                    <div style={{
+                        height: '28px', borderRadius: '8px',
+                        background: 'rgba(255,255,255,0.07)',
+                        width: '70%', marginBottom: '12px',
+                    }} />
+                    <div style={{
+                        height: '12px', borderRadius: '4px',
+                        background: 'rgba(255,255,255,0.04)',
+                        width: '35%',
+                    }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                        width: '56px', height: '56px', borderRadius: '18px',
+                        background: 'rgba(255,255,255,0.07)', flexShrink: 0,
+                    }} />
+                    <div style={{
+                        flex: 1, height: '3px', borderRadius: '9999px',
+                        background: 'rgba(255,255,255,0.05)',
+                    }} />
                 </div>
             </div>
         </div>
