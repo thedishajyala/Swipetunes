@@ -15,7 +15,9 @@ export default function LikedSongsPage() {
     const [audioRef, setAudioRef] = useState(null);
     const [view, setView] = useState("grid"); // "grid" | "list"
     const [exporting, setExporting] = useState(false);
-    const [exportResult, setExportResult] = useState(null); // { playlistUrl, trackCount }
+    const [exportResult, setExportResult] = useState(null);
+    const [sort, setSort] = useState("newest"); // newest | oldest | title | artist
+    const [artistFilter, setArtistFilter] = useState("all"); // "all" or artist name
 
     useEffect(() => {
         async function fetchLikes() {
@@ -61,16 +63,19 @@ export default function LikedSongsPage() {
         else if (session === null) setLoading(false);
     }, [session]);
 
-    // Search filter
+    // Search + Sort + Artist filter
     useEffect(() => {
         const q = search.toLowerCase();
-        if (!q) { setFiltered(tracks); return; }
-        setFiltered(tracks.filter(t =>
-            t.title.toLowerCase().includes(q) ||
-            t.artist.toLowerCase().includes(q) ||
-            t.album.toLowerCase().includes(q)
-        ));
-    }, [search, tracks]);
+        let result = tracks.filter(t =>
+            (!q || t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.album.toLowerCase().includes(q)) &&
+            (artistFilter === "all" || t.artist === artistFilter)
+        );
+        if (sort === "newest") result = [...result].sort((a, b) => new Date(b.liked_at) - new Date(a.liked_at));
+        if (sort === "oldest") result = [...result].sort((a, b) => new Date(a.liked_at) - new Date(b.liked_at));
+        if (sort === "title") result = [...result].sort((a, b) => a.title.localeCompare(b.title));
+        if (sort === "artist") result = [...result].sort((a, b) => a.artist.localeCompare(b.artist));
+        setFiltered(result);
+    }, [search, tracks, sort, artistFilter]);
 
     // Audio preview
     function togglePreview(track) {
@@ -196,7 +201,43 @@ export default function LikedSongsPage() {
                 </div>
             </motion.div>
 
-            {/* Empty state */}
+            {/* Sort + Artist Filter Row */}
+            {tracks.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Sort dropdown */}
+                    <select
+                        value={sort}
+                        onChange={e => setSort(e.target.value)}
+                        className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-[#1DB954]/50 transition-colors cursor-pointer"
+                    >
+                        <option value="newest">↓ Newest first</option>
+                        <option value="oldest">↑ Oldest first</option>
+                        <option value="title">A–Z Title</option>
+                        <option value="artist">A–Z Artist</option>
+                    </select>
+
+                    {/* Artist filter pills */}
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => setArtistFilter("all")}
+                            className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${artistFilter === "all" ? "bg-[#1DB954] text-black" : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"}`}
+                        >
+                            All
+                        </button>
+                        {[...new Set(tracks.map(t => t.artist))].sort().slice(0, 12).map(artist => (
+                            <button
+                                key={artist}
+                                onClick={() => setArtistFilter(artistFilter === artist ? "all" : artist)}
+                                className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest transition-all truncate max-w-[120px] ${artistFilter === artist ? "bg-[#1DB954] text-black" : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"}`}
+                            >
+                                {artist}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+
             {tracks.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
                     <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-6">
