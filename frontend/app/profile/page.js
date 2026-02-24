@@ -29,6 +29,7 @@ export default function ProfilePage() {
     const [recalculating, setRecalculating] = useState(false);
     const [loading, setLoading] = useState(true);
     const [swipeStats, setSwipeStats] = useState({ likes: 0, total: 0, topArtist: null });
+    const [badges, setBadges] = useState([]);
 
     useEffect(() => {
         async function fetchProfileData() {
@@ -44,6 +45,12 @@ export default function ProfilePage() {
                     const gamificationData = await gamificationRes.json();
                     if (gamificationData.stats) setStats(gamificationData.stats);
                     if (gamificationData.achievements) setAchievements(gamificationData.achievements);
+
+                    // Trigger badge check + load badge display
+                    fetch("/api/badge-check", { method: "POST" });
+                    fetch("/api/badge-check")
+                        .then(r => r.json())
+                        .then(data => { if (Array.isArray(data)) setBadges(data); });
 
                     setTopTracks(tracksData.items || []);
                     setTopArtists(artistsData.items.map(a => ({
@@ -359,6 +366,38 @@ export default function ProfilePage() {
                     )}
                 </div>
             </section>
+
+            {/* Badges Showcase */}
+            {badges.length > 0 && (
+                <section className="space-y-6">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-black text-white tracking-tighter">Badges</h2>
+                        <span className="text-xs font-black uppercase tracking-widest text-[#1DB954]">{badges.filter(b => b.earned).length} / {badges.length} earned</span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                        {badges.map(badge => (
+                            <motion.div
+                                key={badge.id}
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                title={badge.desc}
+                                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border text-center transition-all ${badge.earned
+                                        ? "bg-white/[0.06] border-[#1DB954]/30 shadow-lg shadow-[#1DB954]/10"
+                                        : "bg-white/[0.02] border-white/5 opacity-30 grayscale"
+                                    }`}
+                            >
+                                <span className="text-3xl">{badge.emoji}</span>
+                                <span className="text-[10px] font-black text-white leading-tight">{badge.name}</span>
+                                {badge.earned && badge.awarded_at && (
+                                    <span className="text-[9px] text-[#1DB954] font-bold">
+                                        {new Date(badge.awarded_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                    </span>
+                                )}
+                            </motion.div>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             <section className="space-y-12">
                 <div className="flex items-center justify-between">

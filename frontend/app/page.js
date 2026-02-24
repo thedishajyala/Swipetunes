@@ -255,6 +255,10 @@ export default function Home() {
             method: 'POST',
             body: JSON.stringify({ track_id: track.id, action: 'liked' })
           });
+
+          // 4. Check & award badges
+          fetch('/api/badge-check', { method: 'POST' });
+
         } catch (e) {
           console.error("Home: Failed to sync social signal:", e);
         }
@@ -492,8 +496,8 @@ export default function Home() {
                   key={genre}
                   onClick={() => { setSelectedGenre(genre); setCurrentIndex(0); }}
                   className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${selectedGenre === genre
-                      ? "bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20"
-                      : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
+                    ? "bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20"
+                    : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
                     }`}
                 >
                   {genre}
