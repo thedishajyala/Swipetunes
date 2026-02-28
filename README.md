@@ -1,252 +1,386 @@
 # 🎵 SwipeTunes
 
-> **Tinder for Music Discovery** — Swipe. Listen. Vibe. Repeat.
+> **Tinder for Music Discovery** — Swipe. Listen. Feel. Repeat.
 
-SwipeTunes is a full-stack music discovery app powered by the **Spotify API**. Sign in with your Spotify account, get curated tracks pulled from your listening history across all time ranges, and swipe through songs like dating cards — right to like, left to pass. Every swipe shapes your musical identity, earns you XP, unlocks achievements, fills your journal, and connects you with people who share your music DNA.
+SwipeTunes is a **full-stack music discovery app** powered by the **Spotify API**. Sign in with your Spotify account, get a curated feed of tracks pulled from your entire listening history, and swipe through songs like dating cards — right to like ♥, left to pass ✕. Every swipe shapes your musical identity, earns you XP, builds streaks, unlocks badges, fills your journal, and connects you with listeners who share your music DNA.
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
-[![Node.js](https://img.shields.io/badge/Node.js-Express-green?logo=node.js)](https://nodejs.org)
-[![Database](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase)](https://supabase.com)
-[![Auth](https://img.shields.io/badge/Auth-Spotify_OAuth-1DB954?logo=spotify)](https://developer.spotify.com)
-[![TailwindCSS](https://img.shields.io/badge/Styling-TailwindCSS_v4-38BDF8?logo=tailwindcss)](https://tailwindcss.com)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-38BDF8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Node.js](https://img.shields.io/badge/Node.js-Express-green?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![Auth](https://img.shields.io/badge/Auth-Spotify_OAuth_2.0-1DB954?logo=spotify&logoColor=white)](https://developer.spotify.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](https://choosealicense.com/licenses/mit/)
 
 ---
 
-## ✨ Features at a Glance
+## 📖 Table of Contents
+
+- [✨ Features](#-features)
+  - [🃏 Core Swipe Experience](#-core-swipe-experience)
+  - [🏆 Gamification & Progression](#-gamification--progression)
+  - [🏅 Achievement Badges](#-achievement-badges)
+  - [📓 Personal Music History & Journal](#-personal-music-history--journal)
+  - [🧬 Listening Personality Archetypes](#-listening-personality-archetypes)
+  - [👥 Social & Discovery](#-social--discovery)
+  - [💬 Messaging](#-messaging)
+  - [🤖 AI & Smart Recommendations](#-ai--smart-recommendations)
+  - [🎨 UI & Design](#-ui--design)
+- [🏗️ Architecture](#️-architecture)
+- [🗄️ Database Schema](#️-database-schema)
+- [🔌 API Reference](#-api-reference)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [🚀 Getting Started](#-getting-started)
+- [☁️ Deployment](#️-deployment)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+
+---
+
+## ✨ Features
 
 ### 🃏 Core Swipe Experience
+
 | Feature | Description |
 |---|---|
-| **Spotify OAuth Login** | One-click sign-in with Spotify — no separate account needed |
-| **Smart Multi-Source Feed** | Combines short-term, medium-term & long-term top tracks + recently played + liked songs — deduped & shuffled for variety |
-| **Infinite Scroll Queue** | Auto-refills the card queue when fewer than 5 tracks remain |
-| **Drag-to-Swipe Cards** | Smooth Framer Motion card stack — drag right to like ♥, drag left to pass ✕ |
-| **Auto-Play 30s Previews** | Audio preview auto-starts on every new card; animated waveform visualizer syncs with playback |
-| **Animated Swipe Indicators** | Live "Like" / "Nope" overlays appear as you drag the card |
-| **One-Tap Spotify Link** | Jump straight to the full track on Spotify from the card |
-| **Share Track** | Share a track with another curator via the in-card share button |
-| **Genre Filter Pills** | Filter the swipe deck by genre in real time |
-| **Decade Filter** | Browse by era — 60s, 70s, 80s, 90s, 2000s, 2010s, 2020s |
-| **Dynamic Ambient Glow** | Background softly shifts color to match the current track's album art |
+| **Spotify OAuth Login** | One-click sign in with Spotify — no separate registration. Auto-creates a Supabase user profile on first login. |
+| **Smart Multi-Source Feed** | Pulls tracks simultaneously from: short-term top tracks, medium-term top tracks, long-term top tracks, recently played, and saved songs — then deduplicates by track ID and shuffles for variety. |
+| **Prefer-Preview Strategy** | Tracks with a 30s preview URL are prioritized; the full set is used if fewer than 5 previews exist. |
+| **Infinite Queue Refill** | Automatically fetches more tracks when the queue drops below 5 cards remaining. |
+| **Drag-to-Swipe Cards** | Full Framer Motion drag interaction — threshold 100px triggers a like or pass with spring-physics animation. |
+| **Auto-Play 30s Preview** | Audio preview auto-plays 600ms after each card appears; gracefully degrades with a "Tap to Listen" prompt on restricted browsers. |
+| **Animated Waveform Visualizer** | 20-bar deterministic waveform animates in sync with audio playback; bars flatten when paused. |
+| **Live Swipe Overlays** | "LIKE" (green) and "NOPE" (red) stamps overlay the card as you drag, providing instant visual feedback. |
+| **Genre Filter Pills** | Real-time filter pills built from artist genre data — filter the entire deck by genre without a reload. |
+| **Decade / Era Filter** | Dropdown to filter tracks by release decade: 60s, 70s, 80s, 90s, 2000s, 2010s, 2020s. |
+| **Dynamic Ambient Glow** | Background radial gradient shifts to match the current track's album art color on each card change. |
+| **One-Tap Spotify Link** | "Open on Spotify" link on every card — jumps directly to the full track in Spotify. |
+| **In-Card Share Button** | Fires a custom `share-track` browser event that other components can listen to for curator sharing. |
+| **Artist Deep-Link** | Artist name on each card links to `/artist/[id]` for a full artist deep-dive. |
+| **Skeleton Loading** | Animated skeleton card replaces spinner during feed load for a polished perceived performance. |
 
 ---
 
 ### 🏆 Gamification & Progression
-| Feature | Description |
+
+The XP system lives entirely in `/api/gamification` and `user_stats` table.
+
+| Action | XP Reward |
 |---|---|
-| **XP System** | Earn XP for every swipe-like via `/api/gamification` |
-| **Daily Streak Counter** | Log in and swipe daily to keep your streak alive; streak resets if you miss a day |
-| **Achievement Badges** | Auto-awarded at milestone swipe counts via `/api/badge-check` (e.g., First Like, 10 Swipes, 50 Swipes…) |
-| **Leaderboard** | See the top users by XP and the most-liked tracks platform-wide |
-| **Weekly Challenges** | Time-limited swipe challenges that award bonus XP and badges |
+| Swipe Like | **+10 XP** |
+| Share Track / Post | **+25 XP** |
+| Add Comment / React | **+15 XP** |
+| New Follower | **+50 XP** |
+| Daily Streak Bonus | **+100 XP** |
+| Complete a Challenge | **Variable XP** |
+
+**Level-Up:** You level up every `current_level × 500 XP`.
+
+**Daily Streak Logic:**
+- If you already liked a song today → streak unchanged.
+- If you liked yesterday → streak increments +1 and you earn the +100 streak bonus.
+- If you missed a day → streak resets to 1.
 
 ---
 
-### 📓 Personal Music History
+### 🏅 Achievement Badges
+
+12 badges auto-awarded via `/api/badge-check` after every like:
+
+| Badge | Emoji | Condition |
+|---|---|---|
+| First Play | 💿 | Like your first song |
+| Tuneful | 🎵 | Like 10 songs |
+| Music Lover | 🎸 | Like 50 songs |
+| Century Club | 💯 | Like 100 songs |
+| Legend | 🏆 | Like 500 songs |
+| On Fire | 🔥 | 3-day swipe streak |
+| Week Warrior | ⚡ | 7-day swipe streak |
+| Monthly Master | 🌟 | 30-day swipe streak |
+| Rising Star | 🚀 | Reach Level 5 |
+| SwipeTunes Royalty | 👑 | Reach Level 10 |
+| Genre Explorer | 🌍 | Tag 5+ different moods |
+| Night Owl | 🦉 | Like a song between midnight and 5 AM |
+
+---
+
+### 📓 Personal Music History & Journal
+
 | Feature | Description |
 |---|---|
-| **Music Journal** | Every liked track is automatically logged to your journal via `/api/journal` |
-| **Liked Track History** | Browse all your liked tracks in a clean list view (`/history`) |
-| **Full Swipe History** | See every track you've swiped — liked or passed — in chronological order (`/swipe-history`) |
-| **Listening Personality** | Your profile shows one of 8 archetypes (Sonic Explorer, Hype Machine, Nostalgist, etc.) derived from your mood, time-of-day, and taste data via `/api/personality` |
-| **Mood-Based Feed** | `/api/mood` endpoint tags your session mood and influences recommendation weighting |
+| **Music Journal** | Every liked or shared track is automatically written to `music_journal` via `/api/journal`. |
+| **Liked Track History** | `/history` — browse all your liked tracks in reverse-chronological order. |
+| **Full Swipe History** | `/swipe-history` — complete log of every swipe (liked and passed) stored in the `swipes` table. |
+| **Mood Tagging** | Tag any liked track with a mood via `/api/mood` (`Chill`, `Hype`, `Sad`, `Focus`). Mood tags inform personality calculation and badge checks (Night Owl badge). |
+| **Taste Profile** | `user_taste_profile` table stores `avg_energy`, `avg_valence`, and a `mood_tag` per user. |
+
+---
+
+### 🧬 Listening Personality Archetypes
+
+SwipeTunes analyzes your likes to assign one of **8 archetypes** via `/api/personality`:
+
+| Archetype | Emoji | Trigger Condition |
+|---|---|---|
+| **Night Owl** | 🦉 | >40% of your likes happen between 10 PM – 5 AM |
+| **Hype Beast** | 🔥 | >35% of likes tagged "Hype" mood |
+| **Chill Curator** | 😌 | >35% of likes tagged "Chill" mood |
+| **Nostalgia Tripper** | 📼 | >40% of likes are retro tracks |
+| **Genre Jumper** | 🌍 | 5+ unique artists liked (broad taste proxy) |
+| **Deep Focus** | 🎯 | >30% of likes tagged "Focus" mood |
+| **Sad Boi Hours** | 😢 | >30% of likes tagged "Sad" mood |
+| **Sonic Wanderer** | 🎵 | Default — true music explorer |
+
+Each archetype displays a gradient card with a tagline, description, and personal stats on your profile page.
 
 ---
 
 ### 👥 Social & Discovery
+
 | Feature | Description |
 |---|---|
-| **Public User Profiles** | Personalized profile pages showing top genres, personality archetype, and liked tracks |
-| **Follow System** | Follow other music lovers to explore their universe |
-| **Taste Match %** | Get a music compatibility percentage with any user based on shared tracks and artists via `/api/taste-match` |
-| **People Explorer** | Browse the SwipeTunes community and discover listeners like you (`/people`) |
-| **Artist Deep-Dive** | Tap any artist name to see their top tracks, related artists, genres, and bio (`/artist/[id]`) |
-| **Trending Playlists** | Daily auto-generated playlists built from the most-liked swipes across the platform (`/trending`) |
-| **Events Feed** | `/api/events` — discover music events and concerts tied to your top artists |
-| **Posts & Reactions** | `/api/posts` & `/api/reactions` — share micro-posts and react to others' music moments |
-| **Messages** | `/api/messages` — send and receive DMs with fellow listeners |
-| **Export to Spotify Playlist** | Export any collection of liked tracks directly to a new Spotify playlist via `/api/export-playlist` |
+| **Public Profiles** | `/profile/[id]` — view any user's archetype, top genres, liked track count, and personality card. |
+| **Follow System** | Follow/unfollow users; follower and following counts tracked via `followers` table. |
+| **Taste Match %** | `/api/taste-match?userId=X` — computes music compatibility: 60% weight on shared songs, 40% on shared artists, then labels the result (Music Soulmates → Opposite Worlds). |
+| **People Explorer** | `/people` — browse the SwipeTunes community to find other listeners. |
+| **Artist Deep-Dive** | `/artist/[id]` — see an artist's top tracks, genres, related artists, and bio pulled from Spotify. |
+| **Trending Tracks** | `/trending` — real-time ranking of the top 50 most-liked tracks platform-wide from the `likes` table. |
+| **Social Posts** | Post a track to the community feed with a caption and hashtags via `/api/posts`. Automatically rewards 25 XP and logs to journal. |
+| **Emoji Reactions** | React to any track with an emoji via `/api/reactions`. Awards 15 XP per reaction. |
+| **Concert Events** | `/api/events` — discovers upcoming events for your top 5 Spotify artists. Results cached for 24h in `artist_events_cache`. Supports RSVP (`going` / `interested`) via `event_attendance`. |
+| **Export to Spotify** | `/api/export-playlist` — exports all your liked songs into a new private Spotify playlist named "SwipeTunes ❤️ Liked Songs", batched in groups of 100. |
 
 ---
 
-### 🤖 AI & Recommendations
+### 💬 Messaging
+
+Full DM and group chat system powered by `/api/messages`:
+
+| Sub-feature | Description |
+|---|---|
+| **Direct Messages** | Send text messages (and optionally share a track) to any user. |
+| **Group Chat** | Create groups, add members, send group messages. |
+| **Read Receipts** | Messages are marked `read_status = true` when fetched by the receiver. |
+| **Recent Chats List** | Fetches all your recent DMs and group memberships in one call. |
+
+---
+
+### 🤖 AI & Smart Recommendations
+
 | Feature | Description |
 |---|---|
-| **AI Recommendations** | `/api/ai-recommendations` — seed-based smart recommendations powered by your recent likes with mood-mode variants: `morning`, `workout`, `focus`, `vibe` |
-| **Mood Modes** | Toggle between listening modes — each applies different audio-feature targets (energy, valence, tempo, acousticness) |
-| **Fallback Catalog** | Graceful fallback to a curated catalog if Spotify API is unavailable |
-| **Sync Tracks** | `/api/sync-tracks` — syncs your Spotify library with the app's database for consistent cross-feature data |
+| **Seeded Recommendations** | `/api/ai-recommendations` seeds recommendations from your 3 most recent likes and fetches from the Spotify Recommendations API (fallback to curated catalog if Spotify returns nothing). |
+| **Mood Modes** | Pass `?mode=morning`, `?mode=workout`, `?mode=focus`, or `?mode=vibe` to shape audio-feature targets: |
+| → Morning | `energy: 0.4`, `valence: 0.6` (gentle & uplifting) |
+| → Workout | `min_tempo: 120`, `energy: 0.8` (high-intensity) |
+| → Focus | `energy: 0.3`, `acousticness: 0.7` (calm & instrumental) |
+| → Vibe | `target_popularity: 50` (hidden gems) |
+| **Fallback Catalog** | `/lib/fallback-catalog.js` — curated tracks served if Spotify API is unavailable (e.g., deprecation events). |
+| **Spotify Library Sync** | `/api/sync-tracks` — batch-syncs 50 pop tracks from Spotify into the `songs` table using client credentials (no user token needed). |
+| **Weekly Challenges** | `/api/challenges` — challenge system with progress tracking; completing a challenge triggers a bonus XP call to `/api/gamification`. |
 
 ---
 
 ### 🎨 UI & Design
+
 | Feature | Description |
 |---|---|
-| **Dark Glassmorphism Design** | Deep OLED blacks with glass-effect cards, soft borders, and layered blur |
-| **Custom Animated Waveform** | Deterministic waveform bars animate to the beat while audio plays |
-| **Skeleton Loading States** | Smooth skeleton cards replace spinners during feed load |
-| **Micro-Animations** | Hover glow effects on all buttons; spring-physics transitions throughout |
-| **Spotify Green Accent System** | Consistent `#1DB954` theming with green glow effects on primary CTAs |
-| **Responsive Layout** | Optimized for all screen sizes; sidebar collapses cleanly on mobile |
-| **Custom Google Font** | Premium Inter-family typography rendered at proper weights |
+| **Dark OLED Aesthetic** | Near-black `#111` backgrounds with glassmorphism cards, subtle white borders (`rgba(255,255,255,0.06)`), and layered blur effects. |
+| **Spotify Green System** | Consistent `#1DB954` accent — gradient buttons, glowing CTAs (`glow-green` class), green progress bars. |
+| **Micro-Animations** | Spring-physics on card entry, hover scale on all buttons, animated waveform bars, pulse ring on audio prompt. |
+| **Skeleton Loader** | `SkeletonCard` component mirrors the real card layout during feed fetch. |
+| **Framer Motion** | Card drag physics, page transitions, list item stagger animations, ambient background fades. |
+| **Premium Typography** | Google Fonts integration; bold 900-weight headlines with `tracking-tighter` for a modern editorial feel. |
+| **Responsive Sidebar** | `Sidebar.js` (12KB) contains full navigation, streak counter, XP display, and badge showcase — collapses cleanly on mobile. |
+| **Full App Router** | Next.js 15 App Router with per-route layouts; `providers.js` wraps the session provider at the root. |
 
 ---
 
 ## 🏗️ Architecture
 
-SwipeTunes follows a clean **3-Tier Monorepo** architecture:
+SwipeTunes follows a clean **3-Tier Monorepo** pattern:
 
 ```
-┌─────────────────────┐        ┌──────────────────────┐        ┌───────────────────────┐
-│   Next.js Frontend  │◄─HTTPS►│  Node.js Express API │◄─TCP──►│  Supabase (PostgreSQL) │
-│     (Port 3000)     │        │     (Port 5001)      │        │     Cloud Database     │
-└─────────────────────┘        └──────────────────────┘        └───────────────────────┘
-        │
-        ▼
-   Spotify Web API
+┌──────────────────────┐          ┌──────────────────────┐          ┌─────────────────────────┐
+│   Next.js Frontend   │ ◄─HTTPS─► │  Node.js Express API │ ◄─TCP──► │  Supabase (PostgreSQL)  │
+│      Port 3000       │          │       Port 5001      │          │      Cloud Database      │
+└──────────────────────┘          └──────────────────────┘          └─────────────────────────┘
+          │
+          ▼
+    Spotify Web API
+  (OAuth + Data Endpoints)
 ```
 
 ### Backend MVC Structure
 
 ```
 backend/
-├── controllers/          # Business logic per domain
+├── index.js               # Express server entry point, route mounting
+├── controllers/
+│   ├── actionController.js  # Swipe/action recording + playlist trigger
+│   ├── socialController.js  # Follow, getFollowers, getFollowing, getTasteMatch
+│   ├── playlistController.js# Trending & user playlists
+│   └── userController.js    # User profile data
 ├── routes/
-│   ├── actionRoutes.js   # Swipe recording + daily playlist trigger
-│   ├── playlistRoutes.js # Trending & user playlists
-│   ├── socialRoutes.js   # Follow, taste-match
-│   └── userRoutes.js     # User data & profiles
-├── middleware/            # Zod validation, error handling, request logging
-├── lib/                   # Shared utilities
-└── db/                    # Supabase client + optimized SQL indexes
+│   ├── actionRoutes.js      # POST /action  (Zod-validated)
+│   ├── socialRoutes.js      # POST /follow, GET /followers/:id, GET /following/:id, GET /taste-match
+│   ├── playlistRoutes.js    # GET /playlist/today|user|view, GET /playlists/trending
+│   └── userRoutes.js        # GET /users/:id
+├── middleware/
+│   ├── logger.js            # Request logging
+│   ├── errorHandler.js      # Central error handler
+│   └── validation.js        # Zod schema validation
+├── lib/                      # Shared backend utilities
+└── db/                       # Supabase client + SQL indexes
 ```
 
 ### Frontend App Structure
 
 ```
-frontend/app/
-├── page.js               # Main swipe feed (Home)
-├── profile/              # User profiles + listening personality
-├── people/               # Community explorer
-├── artist/[id]/          # Artist deep-dive pages
-├── artists/              # Artist catalog browser
-├── history/              # Liked track history
-├── swipe-history/        # Full swipe log (liked + passed)
-├── trending/             # Trending community playlists
-├── leaderboard/          # Top users by XP
-├── admin/                # Admin dashboard
-└── api/                  # Next.js API routes:
-    ├── ai-recommendations/  # Mood-based smart recommendations
-    ├── badge-check/         # Achievement badge logic
-    ├── challenges/          # Weekly challenge management
-    ├── events/              # Music events tied to top artists
-    ├── export-playlist/     # Export liked tracks → Spotify playlist
-    ├── feed/                # Feed data endpoint
-    ├── gamification/        # XP awarding
-    ├── journal/             # Music journal logging
-    ├── leaderboard/         # Leaderboard data
-    ├── messages/            # DM system
-    ├── mood/                # Mood detection & tagging
-    ├── personality/         # Listening archetype calculation
-    ├── posts/               # Social posts
-    ├── profile/             # Profile data
-    ├── reactions/           # Post reactions
-    ├── recommendations/     # Base recommendations
-    ├── sync-tracks/         # Spotify library sync
-    ├── taste-match/         # Music compatibility %
-    ├── trending/            # Trending playlist data
-    └── users/               # User management
-```
-
-### Frontend Components
-
-```
-frontend/components/
-├── SwipeCard.js          # Core swipe card with audio, waveform, overlays
-├── SkeletonCard.js       # Loading skeleton placeholder
-├── Sidebar.js            # Navigation sidebar with streak, XP, badges
-├── ProfileHeader.js      # Public profile header
-├── ArtistCircle.js       # Artist avatar circle component
-├── ArtistGrid.js         # Grid layout for artist display
-├── CircleCard.js         # Circular content card
-├── CircleGrid.js         # Grid layout for circle cards
-├── TrackListItem.js      # Single track row in list views
-└── UserProfile.js        # User profile card component
+frontend/
+├── app/
+│   ├── page.js              # 🏠 Main swipe feed (home)
+│   ├── layout.js            # Root layout with sidebar + provider
+│   ├── providers.js         # NextAuth SessionProvider wrapper
+│   ├── leaderboard/         # 🏆 Ranked leaderboard (week / month / all-time)
+│   ├── history/             # 📋 Liked track history
+│   ├── swipe-history/       # 📜 Complete swipe log
+│   ├── trending/            # 🔥 Top 50 trending tracks
+│   ├── people/              # 👥 Community explorer
+│   ├── profile/             # 👤 User profile + personality card
+│   ├── artist/[id]/         # 🎤 Artist deep-dive
+│   ├── artists/             # 🎼 Artist browser
+│   ├── admin/               # ⚙️  Admin dashboard
+│   └── api/                 # Next.js API routes (see full table below)
+├── components/
+│   ├── SwipeCard.js         # Core swipe card: art, audio, waveform, overlays, share
+│   ├── SkeletonCard.js      # Animated loading skeleton
+│   ├── Sidebar.js           # Navigation, streak, XP, badges
+│   ├── ProfileHeader.js     # Public profile page header
+│   ├── ArtistCircle.js      # Circular artist avatar
+│   ├── ArtistGrid.js        # Grid of artist circles
+│   ├── CircleCard.js        # Generic circular content card
+│   ├── CircleGrid.js        # Grid layout for circle cards
+│   ├── TrackListItem.js     # Single track row in list views
+│   └── UserProfile.js       # User profile card widget
+├── lib/
+│   ├── auth.js              # NextAuth config, Spotify OAuth, token refresh, Supabase upsert
+│   ├── spotify.js           # Spotify API helpers (top tracks, artists, recommendations)
+│   ├── supabase.js          # Supabase client (anon key)
+│   ├── supabase-admin.js    # Supabase service-role client (server-side)
+│   ├── api.js               # saveAction() helper to call Express backend
+│   └── fallback-catalog.js  # Curated fallback tracks
+├── database_master.sql      # ⬅️ Full PostgreSQL schema — run this in Supabase
+└── public/                  # Static assets & icons
 ```
 
 ---
 
-## 🔌 Key API Endpoints
+## 🗄️ Database Schema
 
-### Backend (Express — Port 5001)
+Full schema in [`database_master.sql`](./frontend/database_master.sql). Run it in the Supabase SQL Editor for a complete setup including tables, RLS policies, and seed data.
 
-| Method | Endpoint | Description |
+### Tables
+
+| Table | Purpose | Key Columns |
 |---|---|---|
-| `POST` | `/action` | Record a swipe action & trigger daily playlist generation |
-| `GET` | `/playlists/trending` | Fetch top community playlists |
-| `POST` | `/follow` | Follow a user |
-| `GET` | `/taste-match` | Music compatibility % between two users |
-| `GET` | `/users/:id` | Fetch user profile data |
+| `users` | Spotify-linked user profiles | `id (uuid)`, `spotify_id`, `display_name`, `profile_pic_url`, `xp`, `level`, `city` |
+| `songs` | Cached track metadata | `track_id (unique)`, `title`, `artist`, `album`, `cover_url`, `preview_url` |
+| `swipes` | Full swipe log (liked + passed) | `user_id`, `track_id`, `liked (bool)` |
+| `likes` | Liked tracks (primary key: user_id + track_id) | `user_id`, `track_id`, `mood`, `created_at` |
+| `followers` | Follow relationships | `user_id`, `friend_id`, `status` |
+| `messages` | DMs and group messages | `sender_id`, `receiver_id`, `group_id`, `message_text`, `track_shared`, `read_status` |
+| `groups` | Group chat rooms | `name`, `created_by` |
+| `group_members` | Group membership | `group_id`, `user_id` |
+| `music_journal` | Automatic like/share activity log | `user_id`, `track_id`, `action` |
+| `user_taste_profile` | Computed taste fingerprint | `avg_energy`, `avg_valence`, `mood_tag` |
+| `challenges` | Challenge definitions | `title`, `type`, `target` |
+| `user_challenge_progress` | Per-user challenge state | `user_id`, `challenge_id`, `progress`, `is_completed` |
+| `posts` | Social music posts | `user_id`, `track_id`, `caption`, `hashtags[]` |
+| `reactions` | Emoji reactions on tracks | `user_id`, `track_id`, `emoji` |
+| `artist_events_cache` | Cached concert events | `artist_name`, `city`, `venue`, `event_date`, `ticket_url`, `fetched_at` |
+| `event_attendance` | RSVP records | `user_id`, `event_id`, `status` |
+| `user_stats` | XP, level, streak per user | `user_id`, `xp`, `level`, `streak_count`, `last_activity` |
+| `user_achievements` | Awarded badges | `user_id`, `badge_id`, `awarded_at` |
 
-### Frontend API Routes (Next.js — Port 3000)
+> 🔒 Row Level Security (RLS) is enabled on all tables with permissive developer-mode policies. Supabase Realtime is enabled for all tables.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/gamification` | Award XP for swipe actions |
-| `POST` | `/api/journal` | Log a liked track to the music journal |
-| `POST` | `/api/badge-check` | Evaluate and award milestone badges |
-| `GET` | `/api/ai-recommendations` | Mood-based smart track recommendations |
-| `GET` | `/api/personality` | Calculate and return listening personality archetype |
-| `GET` | `/api/mood` | Detect and tag current listening mood |
-| `GET` | `/api/leaderboard` | Fetch global XP leaderboard |
-| `GET` | `/api/trending` | Fetch trending playlists |
-| `POST` | `/api/export-playlist` | Export liked tracks to a Spotify playlist |
-| `GET` | `/api/taste-match` | Compute taste compatibility between users |
-| `GET/POST` | `/api/messages` | Fetch/send direct messages |
-| `GET/POST` | `/api/posts` | Fetch/create social posts |
-| `POST` | `/api/reactions` | React to a post |
-| `GET` | `/api/events` | Discover events for top artists |
-| `POST` | `/api/sync-tracks` | Sync Spotify library with app database |
-| `GET` | `/api/feed` | Curated feed data |
-| `GET/PUT` | `/api/profile` | Read/update user profile |
+---
+
+## 🔌 API Reference
+
+### Express Backend (Port 5001)
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/action` | — | Record a swipe action; triggers daily playlist generation. Validated with Zod. |
+| `GET` | `/playlists/trending` | — | Top community-liked playlists |
+| `GET` | `/playlist/today` | — | Today's generated playlist |
+| `POST` | `/follow` | — | Follow a user |
+| `GET` | `/followers/:id` | — | Get followers list for user |
+| `GET` | `/following/:id` | — | Get following list for user |
+| `GET` | `/taste-match` | — | Compute taste compatibility between two users |
+| `GET` | `/users/:id` | — | Fetch user profile |
+
+### Next.js API Routes (Port 3000)
+
+| Method | Endpoint | Requires Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/gamification` | ✅ | Award XP for an action (`swipe_like`, `share_track`, `add_comment`, `new_follower`, `daily_streak`). Returns new XP, level, and streak. |
+| `GET` | `/api/gamification` | ✅ | Fetch current XP, level, streak, and all achievements. |
+| `POST` | `/api/badge-check` | ✅ | Evaluate all 12 badge conditions and award any newly unlocked badges. |
+| `GET` | `/api/badge-check` | ✅ | Return all badges with earned/unearned status. |
+| `POST` | `/api/journal` | ✅ | Log a track action to `music_journal`. Triggers challenge progress update. |
+| `GET` | `/api/journal` | ✅ | Fetch the 20 most recent journal entries for the user. |
+| `GET` | `/api/challenges` | ✅ | Fetch all active challenges merged with user's current progress. |
+| `POST` | `/api/challenges` | ✅ | Increment progress on matching challenges; awards XP on completion. |
+| `GET` | `/api/personality` | ✅ | Compute and return user's listening archetype from like patterns. |
+| `POST` | `/api/mood` | ✅ | Tag a liked track with a mood (`Chill`, `Hype`, `Sad`, `Focus`). |
+| `GET` | `/api/leaderboard?period=week\|month\|alltime` | — | Top 25 users ranked by like count for the selected period. |
+| `GET` | `/api/trending` | — | Top 50 most-liked tracks platform-wide. |
+| `GET` | `/api/ai-recommendations?mode=vibe\|morning\|workout\|focus` | ✅ | Seed-based smart recommendations with mood-mode audio feature targeting. |
+| `POST` | `/api/export-playlist` | ✅ | Export all liked songs to a new private Spotify playlist (batched 100/request). |
+| `GET` | `/api/events?city=...` | ✅ | Fetch upcoming events for your top artists. Cached 24h; supports RSVP. |
+| `POST` | `/api/events` | ✅ | RSVP to an event (`going` / `interested`). |
+| `GET/POST` | `/api/posts` | ✅ | Get community feed / create a post with track, caption, and hashtags. |
+| `GET/POST` | `/api/reactions` | ✅ | Get emoji reactions for a track / add an emoji reaction. |
+| `GET/POST` | `/api/messages` | ✅ | Fetch DMs or group messages / Send a message (text + optional track share). |
+| `GET/POST` | `/api/recommendations` | ✅ | Base recommendations endpoint. |
+| `GET` | `/api/sync-tracks` | — | Batch-sync 50 Spotify pop tracks into the `songs` catalog table. |
+| `GET/PUT` | `/api/profile` | ✅ | Read or update the authenticated user's profile. |
+| `GET` | `/api/taste-match?userId=...` | ✅ | Music compatibility % between you and another user. |
+| `GET` | `/api/users` | ✅ | User listing for People explorer. |
+| `GET` | `/api/feed` | ✅ | Curated discovery feed data. |
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | Next.js 15, React 19, TailwindCSS v4, Framer Motion |
-| **Auth** | NextAuth.js v4 with Spotify OAuth 2.0 |
-| **Backend** | Node.js, Express.js |
-| **Database** | Supabase (PostgreSQL) with optimized SQL indexes |
-| **Music API** | Spotify Web API (top tracks, recently played, saved songs, artists, recommendations) |
-| **Validation** | Zod (backend middleware) |
-| **UI Extras** | React Icons, React Hot Toast, custom CSS animations |
-| **Fonts** | Google Fonts — Inter / custom premium typography |
+| Layer | Technology | Version |
+|---|---|---|
+| **Frontend Framework** | Next.js App Router | 15 |
+| **UI Library** | React | 19 |
+| **Styling** | TailwindCSS | v4 |
+| **Animation** | Framer Motion | Latest |
+| **Auth** | NextAuth.js (Spotify OAuth 2.0) | v4 |
+| **Backend** | Node.js + Express.js | — |
+| **Database** | Supabase (PostgreSQL) | — |
+| **Music API** | Spotify Web API | — |
+| **Input Validation** | Zod (backend middleware) | — |
+| **Icons** | React Icons | — |
+| **Notifications** | React Hot Toast | — |
+| **Typography** | Google Fonts (Inter family) | — |
 
----
+### Spotify OAuth Scopes Requested
 
-## 🗄️ Database Schema (Overview)
-
-| Table | Purpose |
-|---|---|
-| `users` | Spotify-linked user profiles, XP, streaks, personality |
-| `songs` | Persisted track metadata (id, title, artist, album, cover, preview_url) |
-| `likes` | User ↔ track like events |
-| `swipes` | Full swipe history (liked + passed) |
-| `badges` | Available achievement badges |
-| `user_badges` | Awarded badges per user |
-| `follows` | User follow relationships |
-| `journal` | Music journal entries per user |
-| `trending_playlists` | Auto-generated daily trending playlists |
-| `posts` | Social micro-posts |
-| `reactions` | Reactions to posts |
-| `messages` | DM threads |
-| `challenges` | Weekly challenge definitions |
-| `user_challenges` | Challenge progress per user |
+```
+user-read-email, user-read-private,
+playlist-read-private, playlist-read-collaborative,
+playlist-modify-public, playlist-modify-private,
+user-library-read, user-library-modify,
+user-top-read, user-read-recently-played,
+streaming
+```
 
 ---
 
@@ -255,8 +389,8 @@ frontend/components/
 ### Prerequisites
 
 - **Node.js** v18+
-- A **Spotify Developer** account → [Create App](https://developer.spotify.com/dashboard)
-- A **Supabase** project → [supabase.com](https://supabase.com)
+- **Spotify Developer Account** → [Create an app](https://developer.spotify.com/dashboard) with `http://localhost:3000/api/auth/callback/spotify` as a Redirect URI
+- **Supabase Project** → [supabase.com](https://supabase.com)
 
 ### 1. Clone the repository
 
@@ -271,7 +405,7 @@ cd Swipetunes
 npm run install:all
 ```
 
-This installs dependencies for the root, frontend, and backend in one shot.
+Installs dependencies for root, `frontend/`, and `backend/` in a single command.
 
 ### 3. Configure environment variables
 
@@ -279,30 +413,29 @@ This installs dependencies for the root, frontend, and backend in one shot.
 ```env
 SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your_nextauth_secret
+NEXTAUTH_SECRET=any_random_32_char_string
 ```
 
 **`backend/.env`**
 ```env
 PORT=5001
-SUPABASE_URL=your_supabase_url
+SUPABASE_URL=your_supabase_project_url
 SUPABASE_KEY=your_supabase_service_role_key
 ```
 
 ### 4. Set up the database
 
-Run the master SQL migration to create all tables and indexes:
+1. Go to your [Supabase SQL Editor](https://app.supabase.com)
+2. Open `frontend/database_master.sql`
+3. Paste the entire file and click **Run**
 
-```bash
-# Copy frontend/database_master.sql into the Supabase SQL editor and run it
-```
+This creates all 18+ tables, enables RLS with permissive policies, seeds challenge data, and enables Supabase Realtime on all tables.
 
-### 5. Run the app
-
-Start both frontend and backend simultaneously:
+### 5. Start the app
 
 ```bash
 npm run dev
@@ -310,14 +443,13 @@ npm run dev
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:5001 |
+| 🎵 SwipeTunes (Frontend) | http://localhost:3000 |
+| ⚙️ Express API (Backend) | http://localhost:5001 |
 
-Or run individually:
-
+Run individually:
 ```bash
-npm run dev:frontend   # Next.js only
-npm run dev:backend    # Express API only
+npm run dev:frontend   # Next.js dev server
+npm run dev:backend    # Express API
 ```
 
 ---
@@ -326,55 +458,69 @@ npm run dev:backend    # Express API only
 
 ### Frontend → Vercel
 
-Since this is a monorepo, configure Vercel to point at the `frontend/` folder:
+1. Import the repo on [vercel.com](https://vercel.com)
+2. **Settings → General → Root Directory** → set to `frontend`
+3. Add all `frontend/.env.local` variables in **Settings → Environment Variables**
+4. Redeploy
 
-1. Go to **Project Settings → General**
-2. Under **Root Directory**, click **Edit** → set to: `frontend`
-3. Save and **Redeploy**
-
-Add all `frontend/.env.local` variables in Vercel's **Environment Variables** panel.
+Update your Spotify app's Redirect URI to your Vercel domain:
+```
+https://your-app.vercel.app/api/auth/callback/spotify
+```
 
 ### Backend → Render / Railway
-
-Deploy the `backend/` folder as a separate **Web Service**:
 
 | Setting | Value |
 |---|---|
 | Root Directory | `backend` |
 | Build Command | `npm install` |
 | Start Command | `node index.js` |
-| Env Variables | `SUPABASE_URL`, `SUPABASE_KEY`, `PORT` |
+| Environment Variables | `SUPABASE_URL`, `SUPABASE_KEY`, `PORT` |
 
 ---
 
-## 📁 Project Structure
+## 📁 Full Project Structure
 
 ```
-Swipetunes/
-├── frontend/             # Next.js 15 application
-│   ├── app/              # App router pages + API routes
-│   ├── components/       # Reusable UI components
-│   ├── lib/              # Auth, Spotify, Supabase helpers
-│   ├── public/           # Static assets
-│   └── database_master.sql  # Full DB schema
-├── backend/              # Express.js API server
-│   ├── controllers/      # Business logic
-│   ├── routes/           # Express route handlers
-│   ├── middleware/        # Validation, error handling
-│   └── db/               # Supabase client
-└── package.json          # Root monorepo scripts
+Swipetunes/                         ← Monorepo root
+├── package.json                    ← Root scripts: dev, install:all
+├── frontend/                       ← Next.js 15 application
+│   ├── app/
+│   │   ├── page.js                 ← Main swipe feed
+│   │   ├── layout.js               ← Root layout (sidebar + providers)
+│   │   ├── globals.css             ← Global styles + animations
+│   │   ├── leaderboard/page.js     ← Podium + ranked table (week/month/all-time)
+│   │   ├── history/page.js         ← Liked track history
+│   │   ├── swipe-history/page.js   ← Full swipe log
+│   │   ├── trending/page.js        ← Top 50 platform tracks
+│   │   ├── people/page.js          ← Community explorer
+│   │   ├── profile/[id]/page.js    ← Public user profile + archetype
+│   │   ├── artist/[id]/page.js     ← Artist deep-dive
+│   │   ├── admin/page.js           ← Admin dashboard
+│   │   └── api/                    ← 22 Next.js API route handlers
+│   ├── components/                 ← 10 reusable UI components
+│   ├── lib/                        ← 6 helper/config files
+│   ├── public/                     ← Static assets
+│   └── database_master.sql         ← Complete PostgreSQL schema
+└── backend/                        ← Express.js API
+    ├── index.js                    ← Server entry, CORS, route mounting
+    ├── controllers/                ← 4 domain controllers (action, social, playlist, user)
+    ├── routes/                     ← 4 route files
+    ├── middleware/                 ← Logger, error handler, Zod validation
+    ├── lib/                        ← Shared utilities
+    └── db/                         ← Supabase client
 ```
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests are welcome! For major changes, open an issue first.
+Pull requests are welcome! For major changes, please open an issue first.
 
-1. Fork the repo
-2. Create your branch: `git checkout -b feature/amazing-feature`
-3. Commit: `git commit -m 'feat: add amazing feature'`
-4. Push: `git push origin feature/amazing-feature`
+1. Fork the repository
+2. Create your feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'feat: add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
 ---
@@ -385,4 +531,6 @@ Distributed under the [MIT License](https://choosealicense.com/licenses/mit/).
 
 ---
 
-<p align="center">Made with ❤️ and 🎵 by <a href="https://github.com/thedishajyala">Disha Jyala</a></p>
+<p align="center">
+  Made with ❤️ and 🎵 by <a href="https://github.com/thedishajyala">Disha Jyala</a>
+</p>
