@@ -1,10 +1,5 @@
 const supabase = require('../lib/supabase');
-
-async function resolveUserId(spotifyId) {
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spotifyId)) return spotifyId;
-    const { data } = await supabase.from('users').select('id').eq('spotify_id', spotifyId).maybeSingle();
-    return data ? data.id : null;
-}
+const { resolveUserId } = require('../lib/resolveUserId');
 
 const getTodayPlaylist = async (req, res, next) => {
     try {
@@ -28,7 +23,7 @@ const getUserPlaylists = async (req, res, next) => {
         if (!userId) return res.json([]);
 
         const { data } = await supabase.from('playlists')
-            .select('*')
+            .select('*, playlist_tracks(*)')
             .eq('user_id', userId)
             .order('date', { ascending: false });
 
@@ -58,12 +53,12 @@ const viewPlaylist = async (req, res, next) => {
 
 const getTrending = async (req, res, next) => {
     try {
-        // MVP Trending: Latest 20 created
+        // Fetch the 20 most recently created playlists, joining creator info
         const { data } = await supabase.from('playlists')
-            .select('*, users(name, image, spotify_id)')
+            .select('*, users(display_name, profile_pic_url, spotify_id)')
             .order('created_at', { ascending: false })
             .limit(20);
-        res.json(data);
+        res.json(data || []);
     } catch (e) { next(e); }
 };
 

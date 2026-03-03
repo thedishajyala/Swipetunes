@@ -11,6 +11,7 @@ const actionRoutes = require('./routes/actionRoutes');
 const playlistRoutes = require('./routes/playlistRoutes');
 const socialRoutes = require('./routes/socialRoutes');
 const userRoutes = require('./routes/userRoutes');
+const historyRoutes = require('./routes/historyRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -18,34 +19,44 @@ const PORT = process.env.PORT || 5001;
 // Global Middleware
 app.use(cors());
 app.use(express.json());
-app.use(logger); // Request logging
-
-// Route Mounting
-app.use('/action', actionRoutes);
-
-// Playlist Routes Mapping
-// Old API: /playlist/today|user|view  AND /playlists/trending
-// We can mount playlistRoutes on /playlist
-app.use('/playlist', playlistRoutes);
-// Trending was /playlists/trending
-app.use('/playlists', playlistRoutes); // This allows /playlists/trending to work if route matches
-
-// Social Routes Mapping
-// Old API: /follow, /others on root? No, we had /follow, /following/:id on root.
-// To keep exact compatibility we might need to mount on root or refactor frontend.
-// Let's mount on /api and root for compatibility or just root.
-// The user asked for "routes/follows.js", implying clean structure.
-// I will mount them on root to match existing frontend calls, or cleaner prefixes.
-// Frontend calls: /follow, /taste-match, /users.
-app.use('/', socialRoutes); // Mounts /follow, /followers, /taste-match on root
-app.use('/users', userRoutes); // Mounts /users
+app.use(logger);
 
 // Health Check
-app.get("/", (req, res) => {
-    res.send("SwipeTunes Backend (MVC Refactored) is running 🚀");
+app.get("/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// Route Mounting
+// POST /action — Swipe/like action handler
+app.use('/action', actionRoutes);
+
+// GET /playlist/today/:id   — Today's daily playlist for a user
+// GET /playlist/user/:id    — All playlists for a user
+// GET /playlist/view/:id    — View a specific playlist (increments view count)
+// GET /playlist/trending    — 20 most recently created playlists
+// GET /playlists/trending   — Alias for frontend compatibility
+app.use('/playlist', playlistRoutes);
+app.use('/playlists', playlistRoutes);
+
+// Social routes
+// POST   /follow             — Follow a user
+// DELETE /follow             — Unfollow a user
+// GET    /followers/:id      — Get followers of user
+// GET    /following/:id      — Get users that user follows
+// GET    /taste-match        — Taste match score (?me=&other=)
+app.use('/', socialRoutes);
+
+// User routes
+// GET /users                 — List all users (supports ?q= search and ?exclude= filter)
+// GET /users/:id             — Get a single user profile
+app.use('/users', userRoutes);
+
+// History routes
+// GET /history/:id           — Liked songs history for a user
+// GET /history/:id/swipes    — Full swipe history (liked + noped)
+app.use('/history', historyRoutes);
 
 // Central Error Handler (Must be last)
 app.use(errorHandler);
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 SwipeTunes Backend running on port ${PORT}`));
